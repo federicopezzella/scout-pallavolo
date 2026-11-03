@@ -58,11 +58,14 @@ jobs:
       - name: Test
         run: flutter test
 
-      - name: Report PDF di esempio
-        uses: actions/upload-artifact@v4
-        with:
-          name: report-esempio
-          path: build/report_sample.pdf
+      - name: Report PDF di esempio (branch report-preview)
+        run: |
+          mkdir -p /tmp/prev && cp build/report_sample.pdf /tmp/prev/
+          cd /tmp/prev
+          git init -q -b report-preview
+          git add .
+          git -c user.name=ci -c user.email=ci@localhost commit -qm "PDF di esempio build ${{ github.run_number }}"
+          git push -qf "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" report-preview
 
       - name: Build APK
         run: |
