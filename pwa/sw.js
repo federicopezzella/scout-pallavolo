@@ -8,7 +8,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     // un file che manca non deve bloccare l'installazione
-    await Promise.all(PRECACHE.map((url) => cache.add(url).catch(() => null)));
+    await Promise.all(PRECACHE.map((url) => cache.add(new Request(url, { cache: 'reload' })).catch(() => null)));
     await self.skipWaiting();
   })());
 });
