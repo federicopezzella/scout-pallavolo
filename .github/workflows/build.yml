@@ -147,8 +147,14 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
+          name: apk
           path: out
-          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: ipa
+          path: out
 
       - name: Pubblica come release
         uses: softprops/action-gh-release@v2
