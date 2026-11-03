@@ -1,4 +1,4 @@
-name: Build APK
+name: Build APK e IPA
 
 on:
   push:
@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,15 +53,58 @@ jobs:
         run: flutter test
 
       - name: Build APK
-        run: flutter build apk --release
-
-      - name: Rinomina APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk scout-volley-${{ github.run_number }}.apk
+        run: |
+          flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk scout-volley-${{ github.run_number }}.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: scout-volley-apk
+          name: apk
           path: scout-volley-${{ github.run_number }}.apk
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Genera la parte iOS (solo i file mancanti)
+        run: |
+          flutter create --platforms=ios --org it.scoutvolley --project-name scout_pallavolo .
+          rm -f test/widget_test.dart
+
+      - name: Nome dell'app
+        run: /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Scout Volley" ios/Runner/Info.plist
+
+      - run: flutter pub get
+
+      - name: Build iOS (senza firma)
+        run: flutter build ios --release --no-codesign
+
+      - name: Crea IPA
+        run: |
+          mkdir Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qr scout-volley-${{ github.run_number }}.ipa Payload
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipa
+          path: scout-volley-${{ github.run_number }}.ipa
+
+  release:
+    needs: [android, ios]
+    if: always() && needs.android.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
 
       - name: Pubblica come release
         uses: softprops/action-gh-release@v2
@@ -69,4 +112,4 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: Build ${{ github.run_number }}
           prerelease: true
-          files: scout-volley-${{ github.run_number }}.apk
+          files: out/*

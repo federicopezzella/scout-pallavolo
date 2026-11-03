@@ -83,7 +83,7 @@ class HomeScreen extends StatelessWidget {
                   ),
                 )
               : ListView(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                   children: [
                     if (running.isNotEmpty) ...[
                       const Text('IN CORSO', style: labelStyle),
@@ -124,6 +124,11 @@ class _MatchCard extends StatelessWidget {
       current = 'Set ${m.sets.length} · ${st.us}-${st.them}';
     }
     final won = sum.setsUs > sum.setsThem;
+    final narrow = MediaQuery.sizeOf(context).width < 600;
+    if (narrow) {
+      sub = '${fmtDate(m.date)} · $sub';
+      if (current != null) sub = '$current · $sub';
+    }
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
@@ -139,28 +144,28 @@ class _MatchCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
             child: Row(children: [
-              SizedBox(width: 110, child: Text(fmtDate(m.date), style: const TextStyle(color: C.muted, fontSize: 15))),
+              if (!narrow) SizedBox(width: 110, child: Text(fmtDate(m.date), style: const TextStyle(color: C.muted, fontSize: 15))),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('vs ${m.opponent}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w600)),
                   Text(sub, style: const TextStyle(color: C.muted, fontSize: 14)),
                 ]),
               ),
-              if (current != null)
+              if (current != null && !narrow)
                 Padding(
                   padding: const EdgeInsets.only(right: 20),
                   child: Text(current, style: const TextStyle(color: C.accent, fontWeight: FontWeight.w700)),
                 ),
               Text('${sum.setsUs} – ${sum.setsThem}', style: cond(28)),
               const SizedBox(width: 16),
-              if (!live)
+              if (!live && !narrow)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(color: won ? C.win : C.loss, borderRadius: BorderRadius.circular(8)),
                   child: Text(won ? 'Vinta' : 'Persa',
                       style: TextStyle(fontWeight: FontWeight.w700, color: won ? const Color(0xFFB9F0D9) : const Color(0xFFFFC9BE))),
                 )
-              else
+              else if (live && !narrow)
                 FilledButton(onPressed: onTap, child: const Text('Riprendi')),
               const SizedBox(width: 8),
               const Icon(Icons.chevron_right, color: C.muted),

@@ -133,12 +133,15 @@ class _LiveScreenState extends State<LiveScreen> {
           return 'disponibile';
         }
 
+        final screenW = MediaQuery.sizeOf(ctx).width;
+        final narrow = screenW < 760;
         return AlertDialog(
+          insetPadding: const EdgeInsets.all(16),
           title: Text('Cambio · Set ${s.number} · ${fmtClock(s.elapsedSec())} · ${st.us}-${st.them} · usati ${st.subsUsed}/6'),
           content: SizedBox(
-            width: 680,
-            height: 400,
-            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            width: narrow ? screenW - 80 : 680,
+            height: narrow ? 460 : 400,
+            child: Flex(direction: narrow ? Axis.vertical : Axis.horizontal, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   const Text('ESCE (IN CAMPO)', style: labelStyle),
@@ -153,7 +156,7 @@ class _LiveScreenState extends State<LiveScreen> {
                   ),
                 ]),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 16, height: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   const Text('ENTRA (PANCHINA)', style: labelStyle),
@@ -276,134 +279,180 @@ class _LiveScreenState extends State<LiveScreen> {
     final sum = summarize(m);
     return Scaffold(
       body: SafeArea(
-        child: Column(children: [
-          _header(st, sum),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-              child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-                Expanded(flex: 36, child: _courtPanel(st)),
-                const SizedBox(width: 12),
-                Expanded(flex: 40, child: _actionPanel(st)),
+        child: LayoutBuilder(builder: (context, c) {
+          final portrait = c.maxHeight > c.maxWidth;
+          final compact = c.maxWidth < 900;
+          final Widget body;
+          if (!portrait) {
+            body = Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Expanded(flex: 36, child: _courtPanel(st)),
+              const SizedBox(width: 12),
+              Expanded(flex: 40, child: _actionPanel(st)),
+              if (!compact) ...[
                 const SizedBox(width: 12),
                 Expanded(flex: 24, child: _sidePanel(st)),
-              ]),
+              ],
+            ]);
+          } else {
+            final tall = c.maxHeight > 1000;
+            body = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Expanded(flex: 48, child: _courtPanel(st, oneRowButtons: true)),
+              const SizedBox(height: 8),
+              Expanded(flex: 52, child: _actionPanel(st)),
+              if (tall) ...[
+                const SizedBox(height: 8),
+                SizedBox(height: 190, child: _sidePanel(st, horizontal: true)),
+              ],
+            ]);
+          }
+          final chartH = c.maxHeight < 700 || (portrait && c.maxHeight < 1000) ? 100.0 : 150.0;
+          return Column(children: [
+            _header(st, sum, compact: compact),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+                child: body,
+              ),
             ),
-          ),
-          if (st.finished) _setEndBar(st, sum),
-          SizedBox(
-            height: 150,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: _chartPanel(st),
+            if (st.finished) _setEndBar(st, sum),
+            SizedBox(
+              height: chartH,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                child: _chartPanel(st),
+              ),
             ),
-          ),
-        ]),
+          ]);
+        }),
       ),
     );
   }
 
-  Widget _header(SetState st, MatchSummary sum) {
-    Widget btn(String text, VoidCallback? onTap, {IconData? icon}) => Padding(
-          padding: const EdgeInsets.only(left: 8),
+  Widget _header(SetState st, MatchSummary sum, {bool compact = false}) {
+    Widget btn(String text, VoidCallback? onTap) => Padding(
+          padding: const EdgeInsets.only(left: 6),
           child: SizedBox(
-            height: 46,
-            child: OutlinedButton.icon(
+            height: 44,
+            child: OutlinedButton(
               onPressed: onTap,
-              icon: icon == null ? const SizedBox.shrink() : Icon(icon, size: 20),
-              label: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: C.text,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 side: const BorderSide(color: C.border),
                 backgroundColor: C.surface2,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
+              child: Text(text, style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
           ),
         );
     final setsUsBefore = sum.setsUs - (st.finished && st.weWon ? 1 : 0);
     final setsThemBefore = sum.setsThem - (st.finished && !st.weWon ? 1 : 0);
+
+    final back = IconButton(
+      tooltip: 'Partite',
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () => Navigator.of(context).pop(),
+    );
+    final names = Text('${m.teamName}  vs  ${m.opponent}',
+        overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700));
+    final score = Row(mainAxisSize: MainAxisSize.min, children: [
+      if (st.weServe) Container(width: 10, height: 10, decoration: const BoxDecoration(color: C.accent, shape: BoxShape.circle)),
+      const SizedBox(width: 8),
+      Text('${st.us}', style: cond(compact ? 38 : 44)),
+      const SizedBox(width: 14),
+      Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('SET ${s.number}', style: labelStyle),
+        const SizedBox(height: 2),
+        Text('$setsUsBefore – $setsThemBefore', style: cond(17, weight: FontWeight.w600)),
+      ]),
+      const SizedBox(width: 14),
+      Text('${st.them}', style: cond(compact ? 38 : 44, color: const Color(0xFFC4CFDA))),
+      const SizedBox(width: 8),
+      if (!st.weServe) Container(width: 10, height: 10, decoration: const BoxDecoration(color: C.muted, shape: BoxShape.circle)),
+    ]);
+    final clock = Container(
+      height: 44,
+      padding: const EdgeInsets.only(left: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0B0E12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: C.border),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        const Icon(Icons.timer_outlined, size: 18, color: C.muted),
+        const SizedBox(width: 6),
+        Text(fmtClock(s.elapsedSec()), style: cond(22)),
+        IconButton(
+          tooltip: s.running ? 'Pausa cronometro' : 'Avvia cronometro',
+          icon: Icon(s.running ? Icons.pause : Icons.play_arrow),
+          onPressed: st.finished ? null : _toggleClock,
+        ),
+      ]),
+    );
+    final toUs = btn(compact ? 'TO noi ${st.timeoutsUs}' : 'TO noi ${st.timeoutsUs}/2',
+        st.timeoutsUs < 2 && !st.finished ? () => _add('timeout', team: 'us') : null);
+    final toThem = btn(compact ? 'TO avv ${st.timeoutsThem}' : 'TO avv ${st.timeoutsThem}/2',
+        st.timeoutsThem < 2 && !st.finished ? () => _add('timeout', team: 'them') : null);
+    final undo = Padding(
+      padding: const EdgeInsets.only(left: 6),
+      child: IconButton.outlined(
+        tooltip: 'Annulla ultima azione',
+        onPressed: s.events.isEmpty ? null : _undo,
+        icon: const Icon(Icons.undo),
+      ),
+    );
+    final menu = PopupMenuButton<String>(
+      tooltip: 'Altro',
+      onSelected: (v) {
+        if (v == 'stats') {
+          Navigator.of(context).push(MaterialPageRoute(builder: (_) => StatsScreen(match: m)));
+        } else if (v == 'end') {
+          _confirmEndEarly();
+        }
+      },
+      itemBuilder: (_) => const [
+        PopupMenuItem(value: 'stats', child: Text('Statistiche')),
+        PopupMenuItem(value: 'end', child: Text('Chiudi partita')),
+      ],
+    );
+    const deco = BoxDecoration(color: C.surface, border: Border(bottom: BorderSide(color: C.line)));
+
+    if (compact) {
+      return Container(
+        padding: const EdgeInsets.fromLTRB(4, 4, 8, 8),
+        decoration: deco,
+        child: Column(children: [
+          Row(children: [back, Expanded(child: names), undo, menu]),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 6,
+            children: [
+              score,
+              Row(mainAxisSize: MainAxisSize.min, children: [clock, toUs, toThem]),
+            ],
+          ),
+        ]),
+      );
+    }
     return Container(
       height: 70,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: const BoxDecoration(color: C.surface, border: Border(bottom: BorderSide(color: C.line))),
+      decoration: deco,
       child: Row(children: [
-        IconButton(
-          tooltip: 'Partite',
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        back,
+        Expanded(child: names),
+        score,
         Expanded(
-          child: Text('${m.teamName}  vs  ${m.opponent}',
-              overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-        ),
-        Row(children: [
-          if (st.weServe) Container(width: 10, height: 10, decoration: const BoxDecoration(color: C.accent, shape: BoxShape.circle)),
-          const SizedBox(width: 8),
-          Text('${st.us}', style: cond(44)),
-          const SizedBox(width: 16),
-          Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text('SET ${s.number}', style: labelStyle),
-            const SizedBox(height: 2),
-            Text('$setsUsBefore – $setsThemBefore', style: cond(17, weight: FontWeight.w600)),
-          ]),
-          const SizedBox(width: 16),
-          Text('${st.them}', style: cond(44, color: const Color(0xFFC4CFDA))),
-          const SizedBox(width: 8),
-          if (!st.weServe) Container(width: 10, height: 10, decoration: const BoxDecoration(color: C.muted, shape: BoxShape.circle)),
-        ]),
-        Expanded(
-          child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-            Container(
-              height: 46,
-              padding: const EdgeInsets.only(left: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF0B0E12),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: C.border),
-              ),
-              child: Row(children: [
-                const Icon(Icons.timer_outlined, size: 18, color: C.muted),
-                const SizedBox(width: 6),
-                Text(fmtClock(s.elapsedSec()), style: cond(24)),
-                IconButton(
-                  tooltip: s.running ? 'Pausa cronometro' : 'Avvia cronometro',
-                  icon: Icon(s.running ? Icons.pause : Icons.play_arrow),
-                  onPressed: st.finished ? null : _toggleClock,
-                ),
-              ]),
-            ),
-            btn('TO noi ${st.timeoutsUs}/2', st.timeoutsUs < 2 && !st.finished ? () => _add('timeout', team: 'us') : null),
-            btn('TO avv ${st.timeoutsThem}/2', st.timeoutsThem < 2 && !st.finished ? () => _add('timeout', team: 'them') : null),
-            Padding(
-              padding: const EdgeInsets.only(left: 8),
-              child: IconButton.outlined(
-                tooltip: 'Annulla ultima azione',
-                onPressed: s.events.isEmpty ? null : _undo,
-                icon: const Icon(Icons.undo),
-              ),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'Altro',
-              onSelected: (v) {
-                if (v == 'stats') {
-                  Navigator.of(context).push(MaterialPageRoute(builder: (_) => StatsScreen(match: m)));
-                } else if (v == 'end') {
-                  _confirmEndEarly();
-                }
-              },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'stats', child: Text('Statistiche')),
-                PopupMenuItem(value: 'end', child: Text('Chiudi partita')),
-              ],
-            ),
-          ]),
+          child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [clock, toUs, toThem, undo, menu]),
         ),
       ]),
     );
   }
 
-  Widget _courtPanel(SetState st) {
+  Widget _courtPanel(SetState st, {bool oneRowButtons = false}) {
     final setterIdx = st.court.indexWhere((id) => m.player(id)?.role == 'P');
     const order = [3, 2, 1, 4, 5, 0]; // 4 3 2 / 5 6 1
     Widget tile(int idx) {
@@ -466,6 +515,12 @@ class _LiveScreenState extends State<LiveScreen> {
           ),
         );
 
+    final b1 = smallBtn('Cambi ${st.subsUsed}/6', st.finished ? null : () => _subsDialog(st), icon: oneRowButtons ? null : Icons.swap_horiz);
+    final b2 = smallBtn(st.liberoOnCourt ? 'Libero esce' : 'Libero', st.finished ? null : () => _liberoDialog(st),
+        icon: oneRowButtons ? null : Icons.shield_outlined);
+    final b3 = smallBtn('Punto avv.', st.finished ? null : () => _add('pointThem'));
+    final b4 = smallBtn('Errore avv.', st.finished ? null : () => _add('pointUs'));
+
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       Row(children: [
         const Text('1 · GIOCATORE', style: labelStyle),
@@ -488,14 +543,12 @@ class _LiveScreenState extends State<LiveScreen> {
         ),
       ),
       const SizedBox(height: 6),
-      Row(children: [
-        smallBtn('Cambi ${st.subsUsed}/6', st.finished ? null : () => _subsDialog(st), icon: Icons.swap_horiz),
-        smallBtn(st.liberoOnCourt ? 'Libero: esce' : 'Libero', st.finished ? null : () => _liberoDialog(st), icon: Icons.shield_outlined),
-      ]),
-      Row(children: [
-        smallBtn('Punto avv.', st.finished ? null : () => _add('pointThem')),
-        smallBtn('Errore avv.', st.finished ? null : () => _add('pointUs')),
-      ]),
+      if (oneRowButtons)
+        Row(children: [b1, b2, b3, b4])
+      else ...[
+        Row(children: [b1, b2]),
+        Row(children: [b3, b4]),
+      ],
     ]);
   }
 
@@ -511,13 +564,19 @@ class _LiveScreenState extends State<LiveScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(4),
                 child: SizedBox(
-                  height: 54,
+                  height: 50,
                   child: Tile(
                     bg: _skill == sk ? const Color(0xFF2A2320) : C.surface2,
                     border: _skill == sk ? C.accent : C.border,
                     borderWidth: _skill == sk ? 3 : 1,
                     onTap: st.finished ? null : () => setState(() => _skill = _skill == sk ? null : sk),
-                    child: Text(sk, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(sk, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -526,14 +585,18 @@ class _LiveScreenState extends State<LiveScreen> {
       const SizedBox(height: 8),
       Row(children: [
         const Text('3 · VALUTAZIONE', style: labelStyle),
-        const Spacer(),
-        Text(
-          ready
-              ? '${m.nr(_player)} · $_skill'
-              : st.finished
-                  ? 'Set concluso'
-                  : 'Scegli giocatore e fondamentale',
-          style: TextStyle(color: ready ? C.accent : C.muted, fontWeight: FontWeight.w600),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            ready
+                ? '${m.nr(_player)} · $_skill'
+                : st.finished
+                    ? 'Set concluso'
+                    : 'Scegli giocatore e fondamentale',
+            textAlign: TextAlign.right,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: ready ? C.accent : C.muted, fontWeight: FontWeight.w600),
+          ),
         ),
       ]),
       const SizedBox(height: 6),
@@ -553,11 +616,17 @@ class _LiveScreenState extends State<LiveScreen> {
                           border: Colors.transparent,
                           radius: 14,
                           onTap: ready ? () => _add('action', playerId: _player, skill: _skill, grade: g) : null,
-                          child: Column(mainAxisSize: MainAxisSize.min, children: [
-                            Text(g, style: cond(46, color: Colors.white)),
-                            const SizedBox(height: 4),
-                            Text(gradeLabels[g]!, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
-                          ]),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                                Text(g, style: cond(46, color: Colors.white)),
+                                const SizedBox(height: 4),
+                                Text(gradeLabels[g]!, style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white)),
+                              ]),
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -569,7 +638,7 @@ class _LiveScreenState extends State<LiveScreen> {
     ]);
   }
 
-  Widget _sidePanel(SetState st) {
+  Widget _sidePanel(SetState st, {bool horizontal = false}) {
     final recent = s.events
         .where((e) => e.type == 'action' || e.type == 'pointUs' || e.type == 'pointThem')
         .toList()
@@ -590,11 +659,10 @@ class _LiveScreenState extends State<LiveScreen> {
           borderRadius: BorderRadius.circular(12),
         );
 
-    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    final logBox = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const Text('ULTIME AZIONI', style: labelStyle),
       const SizedBox(height: 6),
       Expanded(
-        flex: 5,
         child: Container(
           decoration: box(),
           child: recent.isEmpty
@@ -613,11 +681,11 @@ class _LiveScreenState extends State<LiveScreen> {
                 ]),
         ),
       ),
-      const SizedBox(height: 8),
+    ]);
+    final eventsBox = Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
       const Text('EVENTI DEL SET', style: labelStyle),
       const SizedBox(height: 6),
       Expanded(
-        flex: 4,
         child: Container(
           decoration: box(),
           child: st.eventsLog.isEmpty
@@ -644,6 +712,18 @@ class _LiveScreenState extends State<LiveScreen> {
         ),
       ),
     ]);
+    if (horizontal) {
+      return Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        Expanded(child: logBox),
+        const SizedBox(width: 12),
+        Expanded(child: eventsBox),
+      ]);
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      Expanded(flex: 5, child: logBox),
+      const SizedBox(height: 8),
+      Expanded(flex: 4, child: eventsBox),
+    ]);
   }
 
   Widget _setEndBar(SetState st, MatchSummary sum) {
@@ -654,22 +734,30 @@ class _LiveScreenState extends State<LiveScreen> {
         color: st.weWon ? C.win : C.loss,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(children: [
-        Text(
-          'Set ${s.number} ${st.weWon ? 'vinto' : 'perso'} ${st.us}-${st.them} · durata ${fmtClock(s.elapsedSec())}',
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(width: 12),
-        const Text('(Annulla per correggere l\'ultimo punto)', style: TextStyle(color: C.muted)),
-        const Spacer(),
-        if (sum.over)
-          FilledButton(onPressed: _endMatch, child: Text('Fine partita ${sum.setsUs}-${sum.setsThem}'))
-        else ...[
-          TextButton(onPressed: _confirmEndEarly, child: const Text('Chiudi partita')),
-          const SizedBox(width: 8),
-          FilledButton(onPressed: _nextSet, child: const Text('Prossimo set')),
+      child: Wrap(
+        alignment: WrapAlignment.spaceBetween,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 12,
+        runSpacing: 8,
+        children: [
+          Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(
+              'Set ${s.number} ${st.weWon ? 'vinto' : 'perso'} ${st.us}-${st.them} · durata ${fmtClock(s.elapsedSec())}',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+            ),
+            const Text('Annulla per correggere l\'ultimo punto', style: TextStyle(color: C.muted, fontSize: 13)),
+          ]),
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            if (sum.over)
+              FilledButton(onPressed: _endMatch, child: Text('Fine partita ${sum.setsUs}-${sum.setsThem}'))
+            else ...[
+              TextButton(onPressed: _confirmEndEarly, child: const Text('Chiudi partita')),
+              const SizedBox(width: 8),
+              FilledButton(onPressed: _nextSet, child: const Text('Prossimo set')),
+            ],
+          ]),
         ],
-      ]),
+      ),
     );
   }
 
@@ -683,14 +771,13 @@ class _LiveScreenState extends State<LiveScreen> {
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Row(children: [
-          Text('ANDAMENTO PUNTEGGIO · SET ${s.number}', style: labelStyle),
-          const Spacer(),
+          Expanded(child: Text('ANDAMENTO · SET ${s.number}', style: labelStyle, overflow: TextOverflow.ellipsis)),
           const Legend(color: C.accent, text: 'Noi'),
-          const SizedBox(width: 14),
-          const Legend(color: C.muted, text: 'Avversari'),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
+          const Legend(color: C.muted, text: 'Avv.'),
+          const SizedBox(width: 10),
           const Legend(color: C.timeout, text: 'Timeout', box: true, letter: 'T'),
-          const SizedBox(width: 14),
+          const SizedBox(width: 10),
           const Legend(color: C.sub, text: 'Cambio', box: true, letter: 'C'),
         ]),
         const SizedBox(height: 4),

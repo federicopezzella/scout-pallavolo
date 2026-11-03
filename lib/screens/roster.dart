@@ -131,73 +131,86 @@ class _RosterScreenState extends State<RosterScreen> {
         icon: const Icon(Icons.person_add),
         label: const Text('Aggiungi giocatore'),
       ),
-      body: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        SizedBox(
-          width: 420,
-          child: ListView(padding: const EdgeInsets.all(24), children: [
-            TextField(
-              controller: _name,
-              decoration: const InputDecoration(labelText: 'Nome squadra'),
-              onChanged: (v) {
-                team.name = v.trim().isEmpty ? 'La mia squadra' : v.trim();
-                store.save();
-              },
-            ),
-            const SizedBox(height: 24),
-            const Text('COLORE DIVISA', style: labelStyle),
-            const SizedBox(height: 10),
-            ColorPickerRow(
-              value: team.jerseyColor,
-              onChanged: (c) {
-                setState(() => team.jerseyColor = c);
-                store.save();
-              },
-            ),
-            const SizedBox(height: 24),
-            const Text('COLORE DIVISA LIBERO', style: labelStyle),
-            const SizedBox(height: 10),
-            ColorPickerRow(
-              value: team.liberoColor,
-              onChanged: (c) {
-                setState(() => team.liberoColor = c);
-                store.save();
-              },
-            ),
-            const SizedBox(height: 24),
-            Row(children: [
-              Jersey(color: Color(team.jerseyColor), number: 7, width: 90),
-              const SizedBox(width: 16),
-              Jersey(color: Color(team.liberoColor), number: 1, width: 90),
-            ]),
+      body: LayoutBuilder(builder: (context, c) {
+        final settings = <Widget>[
+          TextField(
+            controller: _name,
+            decoration: const InputDecoration(labelText: 'Nome squadra'),
+            onChanged: (v) {
+              team.name = v.trim().isEmpty ? 'La mia squadra' : v.trim();
+              store.save();
+            },
+          ),
+          const SizedBox(height: 24),
+          const Text('COLORE DIVISA', style: labelStyle),
+          const SizedBox(height: 10),
+          ColorPickerRow(
+            value: team.jerseyColor,
+            onChanged: (col) {
+              setState(() => team.jerseyColor = col);
+              store.save();
+            },
+          ),
+          const SizedBox(height: 24),
+          const Text('COLORE DIVISA LIBERO', style: labelStyle),
+          const SizedBox(height: 10),
+          ColorPickerRow(
+            value: team.liberoColor,
+            onChanged: (col) {
+              setState(() => team.liberoColor = col);
+              store.save();
+            },
+          ),
+          const SizedBox(height: 24),
+          Row(children: [
+            Jersey(color: Color(team.jerseyColor), number: 7, width: 90),
+            const SizedBox(width: 16),
+            Jersey(color: Color(team.liberoColor), number: 1, width: 90),
           ]),
-        ),
-        const VerticalDivider(width: 1, color: C.line),
-        Expanded(
-          child: team.players.isEmpty
-              ? const Center(child: Text('Aggiungi i giocatori della squadra', style: TextStyle(color: C.muted)))
-              : ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
-                  children: [
-                    for (final p in team.players)
-                      ListTile(
-                        leading: Jersey(
-                          color: Color(p.role == 'L' ? team.liberoColor : team.jerseyColor),
-                          number: p.number,
-                          width: 48,
-                        ),
-                        title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        subtitle: Text(roleNames[p.role] ?? p.role),
-                        onTap: () => _edit(p),
-                        trailing: IconButton(
-                          tooltip: 'Rimuovi',
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _remove(p),
-                        ),
-                      ),
-                  ],
-                ),
-        ),
-      ]),
+        ];
+        final players = <Widget>[
+          if (team.players.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(child: Text('Aggiungi i giocatori della squadra', style: TextStyle(color: C.muted))),
+            ),
+          for (final p in team.players)
+            ListTile(
+              leading: Jersey(
+                color: Color(p.role == 'L' ? team.liberoColor : team.jerseyColor),
+                number: p.number,
+                width: 48,
+              ),
+              title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(roleNames[p.role] ?? p.role),
+              onTap: () => _edit(p),
+              trailing: IconButton(
+                tooltip: 'Rimuovi',
+                icon: const Icon(Icons.delete_outline),
+                onPressed: () => _remove(p),
+              ),
+            ),
+        ];
+        if (c.maxWidth < 800) {
+          return ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), children: [
+            ...settings,
+            const SizedBox(height: 24),
+            const Text('GIOCATORI', style: labelStyle),
+            const SizedBox(height: 8),
+            ...players,
+          ]);
+        }
+        return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(
+            width: 420,
+            child: ListView(padding: const EdgeInsets.all(24), children: settings),
+          ),
+          const VerticalDivider(width: 1, color: C.line),
+          Expanded(
+            child: ListView(padding: const EdgeInsets.fromLTRB(16, 16, 16, 100), children: players),
+          ),
+        ]);
+      }),
     );
   }
 }

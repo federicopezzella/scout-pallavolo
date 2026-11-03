@@ -98,12 +98,15 @@ class _LineupScreenState extends State<LineupScreen> {
                   const Icon(Icons.add_circle_outline, size: 36, color: C.muted),
                   Text('Pos ${idx + 1}', style: const TextStyle(color: C.muted)),
                 ])
-              : Column(mainAxisSize: MainAxisSize.min, children: [
+              : FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Jersey(color: Color(m.jerseyColor), number: p.number, width: 70),
                   Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700)),
                   Text('${p.role} · pos ${idx + 1}${idx == 0 ? ' · batte' : ''}',
                       style: const TextStyle(color: C.muted, fontSize: 12)),
                 ]),
+                ),
         ),
       ),
     );
@@ -115,9 +118,11 @@ class _LineupScreenState extends State<LineupScreen> {
     final libCandidates = m.players.where((p) => !_slots.contains(p.id)).toList();
     return Scaffold(
       appBar: AppBar(title: Text('Formazione · Set $setNumber · vs ${m.opponent}')),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      body: LayoutBuilder(builder: (context, c) {
+        final portrait = c.maxHeight > c.maxWidth;
+        return Padding(
+        padding: EdgeInsets.all(portrait ? 12 : 20),
+        child: Flex(direction: portrait ? Axis.vertical : Axis.horizontal, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Expanded(
             flex: 3,
             child: Container(
@@ -137,7 +142,7 @@ class _LineupScreenState extends State<LineupScreen> {
               ]),
             ),
           ),
-          const SizedBox(width: 24),
+          const SizedBox(width: 24, height: 16),
           Expanded(
             flex: 2,
             child: ListView(children: [
@@ -183,7 +188,8 @@ class _LineupScreenState extends State<LineupScreen> {
             ]),
           ),
         ]),
-      ),
+      );
+      }),
     );
   }
 }

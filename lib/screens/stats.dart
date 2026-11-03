@@ -110,7 +110,10 @@ class _StatsScreenState extends State<StatsScreen> {
                 padding: EdgeInsets.all(24),
                 child: Text('Nessuna azione registrata', style: TextStyle(color: C.muted)),
               )
-            : Container(
+            : SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Container(
+                width: MediaQuery.sizeOf(context).width - 40 < 1000 ? 1000.0 : MediaQuery.sizeOf(context).width - 40,
                 decoration: BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(12), border: Border.all(color: C.line)),
                 clipBehavior: Clip.antiAlias,
                 child: Table(
@@ -118,6 +121,7 @@ class _StatsScreenState extends State<StatsScreen> {
                   defaultVerticalAlignment: TableCellVerticalAlignment.middle,
                   children: rows,
                 ),
+              ),
               ),
       ]),
     );
