@@ -460,12 +460,24 @@ class _Builder {
   }
 
   pw.Widget legend() {
-    final eff = [
-      for (final s in reportSkills) '${skillShort[s]} ${efficiencyNotes[s]}',
-    ].join('   ');
-    return pw.Text(
-      'Positività = (# + +) / totale.   Efficienza:  $eff.',
-      style: _t(6.5, color: _muted),
+    pw.Widget item(String k, String v) => pw.SizedBox(
+          width: 170,
+          child: pw.Row(children: [
+            pw.SizedBox(width: 62, child: pw.Text(k, style: _t(6.8, bold: true, color: _muted))),
+            pw.Text(v, style: _t(6.8, color: _muted)),
+          ]),
+        );
+    return pw.Container(
+      padding: const pw.EdgeInsets.fromLTRB(10, 7, 10, 7),
+      decoration: pw.BoxDecoration(color: _zebra, borderRadius: pw.BorderRadius.circular(6)),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text('Come si calcola', style: _t(7.5, bold: true)),
+        pw.SizedBox(height: 4),
+        pw.Wrap(spacing: 8, runSpacing: 3, children: [
+          item('Positività', '(# + +) / totale'),
+          for (final s in reportSkills) item('Eff. ${s.toLowerCase()}', efficiencyNotes[s]!),
+        ]),
+      ]),
     );
   }
 
@@ -474,7 +486,8 @@ class _Builder {
   pw.Widget playerBlock(PlayerReport p) {
     final jersey = _c(m.jerseyColor);
     final light = jersey.luminance > 0.5;
-    return pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+    // Container: il blocco non si spezza tra due pagine
+    return pw.Container(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
       pw.Container(
         padding: const pw.EdgeInsets.only(bottom: 6),
         decoration: pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: _ink, width: 1.2))),
@@ -510,7 +523,7 @@ class _Builder {
         pw.SizedBox(width: 12),
         pw.Expanded(child: chartBox('Efficienza', efficiencyChart(p.table, barH: 7))),
       ]),
-    ]);
+    ]));
   }
 
   pw.Widget _stat(String label, int v, {bool bold = false, PdfColor? color}) => pw.Padding(
