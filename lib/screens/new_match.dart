@@ -16,6 +16,7 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
   final _opp = TextEditingController();
   final _comp = TextEditingController();
   bool _home = true;
+  int _maxSubs = 8;
   String? _error;
 
   @override
@@ -46,6 +47,7 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
       jerseyColor: team.jerseyColor,
       liberoColor: team.liberoColor,
       players: team.players.map((p) => p.copy()).toList(),
+      maxSubs: _maxSubs,
     );
     store.data.matches.add(m);
     await store.save();
@@ -82,6 +84,17 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
                 ],
                 selected: {_home},
                 onSelectionChanged: (s) => setState(() => _home = s.first),
+              ),
+              const SizedBox(height: 20),
+              const Text('SOSTITUZIONI PER SET', style: labelStyle),
+              const SizedBox(height: 8),
+              SegmentedButton<int>(
+                segments: const [
+                  ButtonSegment(value: 8, label: Text('8 (nuovo regolamento)')),
+                  ButtonSegment(value: 6, label: Text('6')),
+                ],
+                selected: {_maxSubs},
+                onSelectionChanged: (s) => setState(() => _maxSubs = s.first),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 16),

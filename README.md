@@ -9,7 +9,7 @@ App Android (Flutter) per lo scout di pallavolo in tempo reale, pensata per tabl
 - **Formazione** per ogni set: 6 posizioni, libero, chi batte.
 - **Inserimento live** in 3 tocchi: maglia → fondamentale → valutazione (`# + ! - / =`).
 - Punteggio, rotazioni e fine set automatici; **Annulla** dell'ultima azione.
-- **Cambi** (max 6 per set, regola del rientro) e **libero** separato (solo seconda linea, esce da solo quando ruota in prima linea).
+- **Cambi** (8 per set come da regolamento FIVB 2026, oppure 6, scelto alla creazione della partita; regola del rientro) e **libero** separato (solo seconda linea, esce da solo quando ruota in prima linea).
 - **Cronometro del set**, minuto di ogni timeout e cambio, **grafico dell'andamento del punteggio** con i marcatori.
 - **Statistiche** per partita e per set; efficienza attacco e positività ricezione.
 

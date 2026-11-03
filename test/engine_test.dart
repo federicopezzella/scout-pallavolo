@@ -79,4 +79,25 @@ void main() {
     s.roles['p1'] = 'O';
     expect(m.roleIn(s, 'p1'), 'O');
   });
+
+  test('8 sostituzioni per set', () {
+    final m = _match();
+    for (var i = 10; i <= 20; i++) {
+      m.players.add(Player(id: 'q$i', number: i, name: 'R$i', roles: ['S']));
+    }
+    final s = SetData(number: 1, lineup: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'], liberoId: null, weServeFirst: true);
+    final outs = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
+    for (var i = 0; i < 6; i++) {
+      s.events.add(GameEvent(type: 'sub', t: 0, outId: outs[i], inId: 'q${10 + i}'));
+    }
+    s.events.add(const GameEvent(type: 'sub', t: 0, outId: 'q10', inId: 'p1'));
+    var st = replaySet(m, s);
+    expect(canSub(m, s, st, 'q11', 'p2'), isNull);
+    s.events.add(const GameEvent(type: 'sub', t: 0, outId: 'q11', inId: 'p2'));
+    st = replaySet(m, s);
+    expect(st.subsUsed, 8);
+    expect(canSub(m, s, st, 'q12', 'p3'), isNotNull);
+    m.maxSubs = 6;
+    expect(canSub(m, s, replaySet(m, s), 'q12', 'p3'), isNotNull);
+  });
 }

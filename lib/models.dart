@@ -222,6 +222,8 @@ class MatchData {
   List<Player> players;
   List<SetData> sets;
   bool finished;
+  /// sostituzioni per set (8 dal nuovo regolamento FIVB 2026, 6 il vecchio)
+  int maxSubs;
 
   MatchData({
     required this.id,
@@ -235,6 +237,7 @@ class MatchData {
     required this.players,
     List<SetData>? sets,
     this.finished = false,
+    this.maxSubs = 8,
   }) : sets = sets ?? [];
 
   Player? player(String? id) {
@@ -275,6 +278,7 @@ class MatchData {
         'players': players.map((p) => p.toJson()).toList(),
         'sets': sets.map((s) => s.toJson()).toList(),
         'finished': finished,
+        'maxSubs': maxSubs,
       };
 
   factory MatchData.fromJson(Map<String, dynamic> j) => MatchData(
@@ -293,6 +297,7 @@ class MatchData {
             .map((e) => SetData.fromJson(e as Map<String, dynamic>))
             .toList(),
         finished: (j['finished'] as bool?) ?? false,
+        maxSubs: (j['maxSubs'] as num?)?.toInt() ?? 8,
       );
 }
 

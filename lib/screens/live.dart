@@ -144,7 +144,7 @@ class _LiveScreenState extends State<LiveScreen> {
         final narrow = screenW < 760;
         return AlertDialog(
           insetPadding: const EdgeInsets.all(16),
-          title: Text('Cambio · Set ${s.number} · ${fmtClock(s.elapsedSec())} · ${st.us}-${st.them} · usati ${st.subsUsed}/6'),
+          title: Text('Cambio · Set ${s.number} · ${fmtClock(s.elapsedSec())} · ${st.us}-${st.them} · usati ${st.subsUsed}/${m.maxSubs}'),
           content: SizedBox(
             width: narrow ? screenW - 80 : 680,
             height: narrow ? 460 : 400,
@@ -522,7 +522,7 @@ class _LiveScreenState extends State<LiveScreen> {
           ),
         );
 
-    final b1 = smallBtn('Cambi ${st.subsUsed}/6', st.finished ? null : () => _subsDialog(st), icon: oneRowButtons ? null : Icons.swap_horiz);
+    final b1 = smallBtn('Cambi ${st.subsUsed}/${m.maxSubs}', st.finished ? null : () => _subsDialog(st), icon: oneRowButtons ? null : Icons.swap_horiz);
     final b2 = smallBtn(st.liberoOnCourt ? 'Libero esce' : 'Libero', st.finished ? null : () => _liberoDialog(st),
         icon: oneRowButtons ? null : Icons.shield_outlined);
     final b3 = smallBtn('Punto avv.', st.finished ? null : () => _add('pointThem'));

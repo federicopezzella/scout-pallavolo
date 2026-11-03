@@ -198,7 +198,7 @@ List<Player> benchPlayers(MatchData m, SetData s, SetState st) => m.players
 
 /// null se il cambio è valido, altrimenti il motivo
 String? canSub(MatchData m, SetData s, SetState st, String outId, String inId) {
-  if (st.subsUsed >= 6) return 'Cambi esauriti (6 su 6)';
+  if (st.subsUsed >= m.maxSubs) return 'Cambi esauriti (${m.maxSubs} su ${m.maxSubs})';
   if (outId == s.liberoId || inId == s.liberoId) {
     return 'Per il libero usa il pulsante Libero';
   }
