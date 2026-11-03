@@ -32,12 +32,13 @@ class _RosterScreenState extends State<RosterScreen> {
   Future<void> _edit([Player? p]) async {
     final numCtrl = TextEditingController(text: p == null ? '' : '${p.number}');
     final name = TextEditingController(text: p?.name ?? '');
-    var role = p?.role ?? 'S';
+    final sel = List<String>.of(p?.roles ?? ['S']);
     String? error;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setD) => AlertDialog(
+          scrollable: true,
           title: Text(p == null ? 'Nuovo giocatore' : 'Modifica giocatore'),
           content: SizedBox(
             width: 420,
@@ -47,6 +48,7 @@ class _RosterScreenState extends State<RosterScreen> {
                   width: 110,
                   child: TextField(
                     controller: numCtrl,
+                    onChanged: (_) => setD(() {}),
                     keyboardType: TextInputType.number,
                     decoration: const InputDecoration(labelText: 'Numero'),
                   ),
@@ -61,13 +63,40 @@ class _RosterScreenState extends State<RosterScreen> {
                 ),
               ]),
               const SizedBox(height: 16),
-              Wrap(spacing: 8, children: [
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('RUOLI (puoi sceglierne più di uno, il primo è il principale)', style: labelStyle),
+              ),
+              const SizedBox(height: 8),
+              Wrap(spacing: 8, runSpacing: 8, children: [
                 for (final r in roles)
-                  ChoiceChip(
-                    label: Text(roleNames[r]!),
-                    selected: role == r,
-                    onSelected: (_) => setD(() => role = r),
+                  FilterChip(
+                    label: Text(sel.contains(r) && sel.first == r && sel.length > 1
+                        ? '${roleNames[r]!} (principale)'
+                        : roleNames[r]!),
+                    selected: sel.contains(r),
+                    onSelected: (v) => setD(() {
+                      if (v) {
+                        if (!sel.contains(r)) sel.add(r);
+                      } else if (sel.length > 1) {
+                        sel.remove(r);
+                      }
+                    }),
                   ),
+              ]),
+              const SizedBox(height: 16),
+              Row(children: [
+                if (sel.any((r) => r != 'L')) ...[
+                  Jersey(color: Color(team.jerseyColor), number: int.tryParse(numCtrl.text.trim()) ?? 0, width: 56),
+                  const SizedBox(width: 8),
+                  Text(sel.contains('L') ? 'in campo' : 'divisa', style: const TextStyle(color: C.muted)),
+                  const SizedBox(width: 20),
+                ],
+                if (sel.contains('L')) ...[
+                  Jersey(color: Color(team.liberoColor), number: int.tryParse(numCtrl.text.trim()) ?? 0, width: 56),
+                  const SizedBox(width: 8),
+                  const Text('da libero', style: TextStyle(color: C.muted)),
+                ],
               ]),
               if (error != null) ...[
                 const SizedBox(height: 12),
@@ -104,11 +133,11 @@ class _RosterScreenState extends State<RosterScreen> {
     if (ok == true) {
       final n = int.parse(numCtrl.text.trim());
       if (p == null) {
-        team.players.add(Player(id: newId(), number: n, name: name.text.trim(), role: role));
+        team.players.add(Player(id: newId(), number: n, name: name.text.trim(), roles: sel));
       } else {
         p.number = n;
         p.name = name.text.trim();
-        p.role = role;
+        p.roles = List.of(sel);
       }
       team.players.sort((a, b) => a.number.compareTo(b.number));
       await store.save();
@@ -176,13 +205,18 @@ class _RosterScreenState extends State<RosterScreen> {
             ),
           for (final p in team.players)
             ListTile(
-              leading: Jersey(
-                color: Color(p.role == 'L' ? team.liberoColor : team.jerseyColor),
-                number: p.number,
-                width: 48,
+              leading: SizedBox(
+                width: 100,
+                child: Row(children: [
+                  if (!p.onlyLibero) Jersey(color: Color(team.jerseyColor), number: p.number, width: 46),
+                  if (p.canLibero) ...[
+                    const SizedBox(width: 4),
+                    Jersey(color: Color(team.liberoColor), number: p.number, width: 46),
+                  ],
+                ]),
               ),
               title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(roleNames[p.role] ?? p.role),
+              subtitle: Text(p.rolesLabel),
               onTap: () => _edit(p),
               trailing: IconButton(
                 tooltip: 'Rimuovi',

@@ -45,6 +45,13 @@ class _LiveScreenState extends State<LiveScreen> {
     final before = replaySet(m, s);
     final scoring = type == 'action' || type == 'pointUs' || type == 'pointThem';
     if (before.finished && scoring) return;
+    if (type == 'sub' && inId != null && outId != null && !s.roles.containsKey(inId)) {
+      final pin = m.player(inId);
+      final outRole = m.roleIn(s, outId);
+      if (pin != null && pin.fieldRoles.isNotEmpty) {
+        s.roles[inId] = pin.fieldRoles.contains(outRole) ? outRole : pin.fieldRoles.first;
+      }
+    }
     s.start();
     s.events.add(GameEvent(
       type: type,
@@ -453,7 +460,7 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Widget _courtPanel(SetState st, {bool oneRowButtons = false}) {
-    final setterIdx = st.court.indexWhere((id) => m.player(id)?.role == 'P');
+    final setterIdx = st.court.indexWhere((id) => m.roleIn(s, id) == 'P');
     const order = [3, 2, 1, 4, 5, 0]; // 4 3 2 / 5 6 1
     Widget tile(int idx) {
       final id = st.court[idx];
@@ -478,7 +485,7 @@ class _LiveScreenState extends State<LiveScreen> {
                     Jersey(color: _jerseyColor(id), number: p?.number ?? 0, width: w),
                     const SizedBox(height: 2),
                     Text(p?.name ?? '?', overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    Text('${p?.role ?? ''} · pos ${idx + 1}', style: const TextStyle(fontSize: 11, color: C.muted)),
+                    Text('${m.roleIn(s, id)} · pos ${idx + 1}', style: const TextStyle(fontSize: 11, color: C.muted)),
                   ]);
                 }),
               ),

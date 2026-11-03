@@ -27,7 +27,7 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
 
   Future<void> _create() async {
     final team = store.data.team;
-    final field = team.players.where((p) => p.role != 'L').length;
+    final field = team.players.where((p) => p.fieldRoles.isNotEmpty).length;
     if (field < 6) {
       setState(() => _error = 'Servono almeno 6 giocatori (non liberi) nella rosa. Ora ne hai $field.');
       return;

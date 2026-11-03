@@ -19,26 +19,40 @@ class Player {
   String id;
   int number;
   String name;
-  String role;
+  /// Ruoli che sa fare, il primo è quello principale. Es. ['S', 'O'] o ['S', 'L'].
+  List<String> roles;
 
   Player({
     required this.id,
     required this.number,
     required this.name,
-    required this.role,
-  });
+    required List<String> roles,
+  }) : roles = roles.isEmpty ? ['S'] : List.of(roles);
+
+  String get role => roles.first;
+  bool get canLibero => roles.contains('L');
+  bool get onlyLibero => roles.every((r) => r == 'L');
+  List<String> get fieldRoles => roles.where((r) => r != 'L').toList();
+  String get rolesShort => roles.join('/');
+  String get rolesLabel => roles.map((r) => roleNames[r] ?? r).join(', ');
 
   Map<String, dynamic> toJson() =>
-      {'id': id, 'number': number, 'name': name, 'role': role};
+      {'id': id, 'number': number, 'name': name, 'roles': roles};
 
-  factory Player.fromJson(Map<String, dynamic> j) => Player(
-        id: j['id'] as String,
-        number: (j['number'] as num).toInt(),
-        name: j['name'] as String,
-        role: j['role'] as String,
-      );
+  factory Player.fromJson(Map<String, dynamic> j) {
+    final raw = j['roles'];
+    final roles = raw is List
+        ? raw.map((e) => e as String).toList()
+        : [(j['role'] as String?) ?? 'S'];
+    return Player(
+      id: j['id'] as String,
+      number: (j['number'] as num).toInt(),
+      name: j['name'] as String,
+      roles: roles,
+    );
+  }
 
-  Player copy() => Player(id: id, number: number, name: name, role: role);
+  Player copy() => Player(id: id, number: number, name: name, roles: roles);
 }
 
 class Team {
@@ -133,6 +147,8 @@ class SetData {
   String? liberoId;
   bool weServeFirst;
   List<GameEvent> events;
+  /// ruolo giocato in questo set (id giocatore -> 'P','S','C','O')
+  Map<String, String> roles;
   int clockMs;
   int? runningSince;
 
@@ -142,9 +158,11 @@ class SetData {
     required this.liberoId,
     required this.weServeFirst,
     List<GameEvent>? events,
+    Map<String, String>? roles,
     this.clockMs = 0,
     this.runningSince,
-  }) : events = events ?? [];
+  })  : events = events ?? [],
+        roles = roles ?? {};
 
   bool get running => runningSince != null;
 
@@ -173,6 +191,7 @@ class SetData {
         'liberoId': liberoId,
         'weServeFirst': weServeFirst,
         'events': events.map((e) => e.toJson()).toList(),
+        'roles': roles,
         'clockMs': clockMs,
         'runningSince': runningSince,
       };
@@ -185,6 +204,7 @@ class SetData {
         events: (j['events'] as List)
             .map((e) => GameEvent.fromJson(e as Map<String, dynamic>))
             .toList(),
+        roles: (j['roles'] as Map?)?.map((k, v) => MapEntry(k as String, v as String)) ?? {},
         clockMs: (j['clockMs'] as num?)?.toInt() ?? 0,
         runningSince: (j['runningSince'] as num?)?.toInt(),
       );
@@ -223,6 +243,18 @@ class MatchData {
       if (p.id == id) return p;
     }
     return null;
+  }
+
+  /// Ruolo che il giocatore ricopre nel set (L se è il libero del set).
+  String roleIn(SetData s, String? id) {
+    if (id == null) return '';
+    if (id == s.liberoId) return 'L';
+    final r = s.roles[id];
+    if (r != null) return r;
+    final p = player(id);
+    if (p == null) return '';
+    final f = p.fieldRoles;
+    return f.isEmpty ? p.role : f.first;
   }
 
   /// "#7" per un id giocatore

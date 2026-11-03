@@ -19,6 +19,7 @@ class _LineupScreenState extends State<LineupScreen> {
   late List<String?> _slots; // indice 0 = posizione 1
   String? _libero;
   bool _weServe = true;
+  final Map<String, String> _roles = {};
 
   MatchData get m => widget.match;
   int get setNumber => m.sets.length + 1;
@@ -31,9 +32,11 @@ class _LineupScreenState extends State<LineupScreen> {
       _slots = List<String?>.from(prev.lineup);
       _libero = prev.liberoId;
       _weServe = !prev.weServeFirst; // di solito si alterna
+      _roles.addAll(prev.roles);
     } else {
       _slots = List<String?>.filled(6, null);
-      final libs = m.players.where((p) => p.role == 'L').toList();
+      final only = m.players.where((p) => p.onlyLibero).toList();
+      final libs = only.isNotEmpty ? only : m.players.where((p) => p.canLibero).toList();
       _libero = libs.isEmpty ? null : libs.first.id;
     }
   }
@@ -41,7 +44,9 @@ class _LineupScreenState extends State<LineupScreen> {
   Future<void> _pick(int idx) async {
     final used = {..._slots.whereType<String>(), if (_libero != null) _libero!};
     final current = _slots[idx];
-    final options = m.players.where((p) => p.id == current || !used.contains(p.id)).toList();
+    final options = m.players
+        .where((p) => p.fieldRoles.isNotEmpty && (p.id == current || !used.contains(p.id)))
+        .toList();
     final chosen = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: C.surface,
@@ -59,7 +64,7 @@ class _LineupScreenState extends State<LineupScreen> {
                     child: Text('${p.number}',
                         style: TextStyle(fontSize: 12, color: isLight(Color(m.jerseyColor)) ? C.bg : Colors.white)),
                   ),
-                  label: Text('${p.name} (${p.role})'),
+                  label: Text('${p.name} (${p.rolesShort})'),
                   onPressed: () => Navigator.pop(ctx, p.id),
                 ),
             ]),
@@ -67,7 +72,40 @@ class _LineupScreenState extends State<LineupScreen> {
         ),
       ),
     );
-    if (chosen != null) setState(() => _slots[idx] = chosen);
+    if (chosen == null) return;
+    final p = m.player(chosen);
+    if (p == null) return;
+    var role = _roles[chosen];
+    if (role == null || !p.fieldRoles.contains(role)) role = p.fieldRoles.first;
+    if (p.fieldRoles.length > 1 && mounted) {
+      final picked = await showDialog<String>(
+        context: context,
+        builder: (ctx) => SimpleDialog(
+          title: Text('Ruolo di ${p.name} in questo set'),
+          children: [
+            for (final r in p.fieldRoles)
+              SimpleDialogOption(
+                onPressed: () => Navigator.pop(ctx, r),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(roleNames[r] ?? r, style: const TextStyle(fontSize: 17)),
+                ),
+              ),
+          ],
+        ),
+      );
+      if (picked != null) role = picked;
+    }
+    setState(() {
+      _slots[idx] = chosen;
+      _roles[chosen] = role!;
+    });
+  }
+
+  String _roleOf(Player p) {
+    final r = _roles[p.id];
+    if (r != null && p.fieldRoles.contains(r)) return r;
+    return p.fieldRoles.isEmpty ? p.role : p.fieldRoles.first;
   }
 
   Future<void> _start() async {
@@ -76,6 +114,10 @@ class _LineupScreenState extends State<LineupScreen> {
       lineup: _slots.map((e) => e!).toList(),
       liberoId: _libero,
       weServeFirst: _weServe,
+      roles: {
+        for (final id in _slots.whereType<String>())
+          if (m.player(id) != null) id: _roleOf(m.player(id)!),
+      },
     );
     m.sets.add(s);
     await store.save();
@@ -103,7 +145,7 @@ class _LineupScreenState extends State<LineupScreen> {
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Jersey(color: Color(m.jerseyColor), number: p.number, width: 70),
                   Text(p.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                  Text('${p.role} · pos ${idx + 1}${idx == 0 ? ' · batte' : ''}',
+                  Text('${roleNames[_roleOf(p)] ?? _roleOf(p)} · pos ${idx + 1}${idx == 0 ? ' · batte' : ''}',
                       style: const TextStyle(color: C.muted, fontSize: 12)),
                 ]),
                 ),
@@ -115,7 +157,7 @@ class _LineupScreenState extends State<LineupScreen> {
   @override
   Widget build(BuildContext context) {
     final ready = _slots.every((e) => e != null);
-    final libCandidates = m.players.where((p) => !_slots.contains(p.id)).toList();
+    final libCandidates = m.players.where((p) => !_slots.contains(p.id) && p.canLibero).toList();
     return Scaffold(
       appBar: AppBar(title: Text('Formazione · Set $setNumber · vs ${m.opponent}')),
       body: LayoutBuilder(builder: (context, c) {
@@ -147,6 +189,9 @@ class _LineupScreenState extends State<LineupScreen> {
             flex: 2,
             child: ListView(children: [
               const Text('LIBERO', style: labelStyle),
+              const SizedBox(height: 4),
+              const Text('Chi ha il ruolo libero nella rosa. Da libero indossa la divisa del libero.',
+                  style: TextStyle(color: C.muted, fontSize: 13)),
               const SizedBox(height: 8),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 ChoiceChip(
@@ -156,7 +201,12 @@ class _LineupScreenState extends State<LineupScreen> {
                 ),
                 for (final p in libCandidates)
                   ChoiceChip(
-                    label: Text('#${p.number} ${p.name}'),
+                    avatar: CircleAvatar(
+                      backgroundColor: Color(m.liberoColor),
+                      child: Text('${p.number}',
+                          style: TextStyle(fontSize: 12, color: isLight(Color(m.liberoColor)) ? C.bg : Colors.white)),
+                    ),
+                    label: Text(p.name),
                     selected: _libero == p.id,
                     onSelected: (_) => setState(() => _libero = p.id),
                   ),

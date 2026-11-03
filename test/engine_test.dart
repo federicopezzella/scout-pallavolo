@@ -4,7 +4,7 @@ import 'package:scout_pallavolo/models.dart';
 
 MatchData _match() {
   final players = [
-    for (var i = 1; i <= 9; i++) Player(id: 'p$i', number: i, name: 'G$i', role: i == 9 ? 'L' : 'S'),
+    for (var i = 1; i <= 9; i++) Player(id: 'p$i', number: i, name: 'G$i', roles: i == 9 ? ['L'] : ['S']),
   ];
   return MatchData(
     id: 'm',
@@ -64,5 +64,19 @@ void main() {
     final st = replaySet(m, s);
     expect(st.court[3], 'p5');
     expect(st.liberoOnCourt, false);
+  });
+
+  test('giocatore con ruoli multipli e vecchio formato', () {
+    final old = Player.fromJson({'id': 'a', 'number': 3, 'name': 'X', 'role': 'C'});
+    expect(old.roles, ['C']);
+    final multi = Player(id: 'b', number: 4, name: 'Y', roles: ['S', 'L']);
+    expect(multi.canLibero, true);
+    expect(multi.onlyLibero, false);
+    expect(multi.fieldRoles, ['S']);
+    final m = _match()..players.add(multi);
+    final s = SetData(number: 1, lineup: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'], liberoId: 'b', weServeFirst: true);
+    expect(m.roleIn(s, 'b'), 'L');
+    s.roles['p1'] = 'O';
+    expect(m.roleIn(s, 'p1'), 'O');
   });
 }
