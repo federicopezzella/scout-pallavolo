@@ -58,6 +58,12 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Report PDF di esempio
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-esempio
+          path: build/report_sample.pdf
+
       - name: Build APK
         run: |
           flutter build apk --release

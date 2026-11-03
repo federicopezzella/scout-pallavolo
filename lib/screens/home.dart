@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../analytics.dart';
 import '../engine.dart';
 import '../models.dart';
 import '../store.dart';
 import '../theme.dart';
+import '../widgets.dart';
 import 'backup.dart';
 import 'lineup.dart';
 import 'live.dart';
@@ -111,6 +113,10 @@ class HomeScreen extends StatelessWidget {
                           ),
                         ),
                       ),
+                    if (done.isNotEmpty) ...[
+                      _TrendSection(matches: store.data.matches),
+                      const SizedBox(height: 24),
+                    ],
                     if (running.isNotEmpty) ...[
                       const Text('IN CORSO', style: labelStyle),
                       const SizedBox(height: 8),
@@ -200,5 +206,67 @@ class _MatchCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _TrendSection extends StatelessWidget {
+  final List<MatchData> matches;
+  const _TrendSection({required this.matches});
+
+  @override
+  Widget build(BuildContext context) {
+    final trend = lastMatchesTrend(matches);
+    final labels = [
+      for (final t in trend)
+        t.match.opponent.length > 10 ? '${t.match.opponent.substring(0, 9)}…' : t.match.opponent,
+    ];
+    final sub = trend.length == 1 ? 'ultima partita' : 'ultime ${trend.length} partite';
+    final cards = [
+      TrendCard(
+        title: 'Positività ricezione',
+        subtitle: sub,
+        values: [for (final t in trend) t.receptionPositivity],
+        labels: labels,
+        color: const Color(0xFF4FB38A),
+      ),
+      TrendCard(
+        title: 'Efficienza attacco',
+        subtitle: sub,
+        values: [for (final t in trend) t.attackEfficiency],
+        labels: labels,
+        signed: true,
+        color: C.accent,
+      ),
+      TrendCard(
+        title: 'Efficienza battuta',
+        subtitle: sub,
+        values: [for (final t in trend) t.serveEfficiency],
+        labels: labels,
+        signed: true,
+        color: const Color(0xFF7FB2FF),
+      ),
+      TrendCard(
+        title: 'Muri punto',
+        subtitle: sub,
+        values: [for (final t in trend) t.blockPoints.toDouble()],
+        labels: labels,
+        percent: false,
+        color: const Color(0xFFE9C46A),
+      ),
+    ];
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      const Text('ANDAMENTO SQUADRA', style: labelStyle),
+      const SizedBox(height: 8),
+      LayoutBuilder(builder: (context, c) {
+        final cols = c.maxWidth >= 1100 ? 4 : (c.maxWidth >= 560 ? 2 : 1);
+        const gap = 12.0;
+        final w = (c.maxWidth - gap * (cols - 1)) / cols;
+        return Wrap(
+          spacing: gap,
+          runSpacing: gap,
+          children: [for (final card in cards) SizedBox(width: w, child: card)],
+        );
+      }),
+    ]);
   }
 }

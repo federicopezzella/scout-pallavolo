@@ -289,3 +289,158 @@ class Legend extends StatelessWidget {
     ]);
   }
 }
+
+/// Card con grafico a barre delle ultime partite (una barra per partita).
+class TrendCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final List<double?> values;
+  final List<String> labels;
+  final bool percent;
+  final bool signed;
+  final Color color;
+
+  const TrendCard({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.values,
+    required this.labels,
+    this.percent = true,
+    this.signed = false,
+    this.color = C.accent,
+  });
+
+  String fmt(double? v) {
+    if (v == null) return '–';
+    if (!percent) return v.round().toString();
+    final p = (v * 100).round();
+    return signed && p > 0 ? '+$p%' : '$p%';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final valid = values.whereType<double>().toList();
+    final last = values.isEmpty ? null : values.last;
+    final avg = valid.isEmpty ? null : valid.reduce((a, b) => a + b) / valid.length;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      decoration: BoxDecoration(
+        color: C.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: C.line),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 2),
+              Text(subtitle, style: const TextStyle(fontSize: 12, color: C.muted)),
+            ]),
+          ),
+          Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+            Text(fmt(last), style: cond(26, color: color)),
+            Text('media ${fmt(avg)}', style: const TextStyle(fontSize: 11, color: C.muted)),
+          ]),
+        ]),
+        const SizedBox(height: 10),
+        SizedBox(
+          height: 130,
+          child: CustomPaint(
+            painter: _TrendPainter(values, labels, percent, signed, color, avg, fmt),
+            child: const SizedBox.expand(),
+          ),
+        ),
+      ]),
+    );
+  }
+}
+
+class _TrendPainter extends CustomPainter {
+  final List<double?> values;
+  final List<String> labels;
+  final bool percent;
+  final bool signed;
+  final Color color;
+  final double? avg;
+  final String Function(double?) fmt;
+  _TrendPainter(this.values, this.labels, this.percent, this.signed, this.color, this.avg, this.fmt);
+
+  TextPainter _tp(String s, {double size = 10, Color c = C.muted, bool bold = false}) => TextPainter(
+        text: TextSpan(text: s, style: TextStyle(fontSize: size, color: c, fontWeight: bold ? FontWeight.w700 : FontWeight.w400)),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '…',
+      );
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.isEmpty) return;
+    const top = 16.0, bottom = 18.0;
+    final h = size.height - top - bottom;
+    final valid = values.whereType<double>();
+    double maxV, minV;
+    if (percent && !signed) {
+      maxV = 1;
+      minV = 0;
+    } else if (signed) {
+      final m = valid.isEmpty ? 0.25 : valid.map((v) => v.abs()).reduce(math.max);
+      maxV = math.max(0.25, (m * 4).ceil() / 4);
+      minV = valid.any((v) => v < 0) ? -maxV : 0;
+    } else {
+      final m = valid.isEmpty ? 1.0 : valid.reduce(math.max);
+      maxV = math.max(4, m + 1).toDouble();
+      minV = 0;
+    }
+    double y(double v) => top + h * (maxV - v) / (maxV - minV);
+
+    final grid = Paint()
+      ..color = C.line
+      ..strokeWidth = 1;
+    canvas.drawLine(Offset(0, y(maxV)), Offset(size.width, y(maxV)), grid);
+    canvas.drawLine(Offset(0, y((maxV + minV) / 2)), Offset(size.width, y((maxV + minV) / 2)), grid);
+    final zero = Paint()
+      ..color = C.border
+      ..strokeWidth = 1.4;
+    canvas.drawLine(Offset(0, y(0)), Offset(size.width, y(0)), zero);
+
+    // media tratteggiata
+    final a = avg;
+    if (a != null && values.length > 1) {
+      final ay = y(a);
+      final dash = Paint()
+        ..color = C.muted.withValues(alpha: 0.7)
+        ..strokeWidth = 1;
+      for (var x = 0.0; x < size.width; x += 8) {
+        canvas.drawLine(Offset(x, ay), Offset(math.min(x + 4, size.width), ay), dash);
+      }
+    }
+
+    final slot = size.width / values.length;
+    final barW = math.min(38.0, slot * 0.5);
+    for (var i = 0; i < values.length; i++) {
+      final cx = slot * i + slot / 2;
+      final v = values[i];
+      final isLast = i == values.length - 1;
+      if (v != null) {
+        final y0 = y(0), y1 = y(v);
+        final rect = Rect.fromLTRB(cx - barW / 2, math.min(y0, y1), cx + barW / 2, math.max(y0, y1) + (v == 0 ? 2 : 0));
+        final base = v < 0 ? const Color(0xFFE5695A) : color;
+        final paint = Paint()..color = isLast ? base : base.withValues(alpha: 0.55);
+        canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(4)), paint);
+        final vt = _tp(fmt(v), size: 11, c: isLast ? C.text : C.muted, bold: isLast)..layout();
+        final ly = v >= 0 ? rect.top - vt.height - 2 : rect.bottom + 2;
+        vt.paint(canvas, Offset(cx - vt.width / 2, ly));
+      } else {
+        final nt = _tp('n.d.', size: 10)..layout();
+        nt.paint(canvas, Offset(cx - nt.width / 2, y(0) - nt.height - 2));
+      }
+      final lt = _tp(labels[i], size: 10, c: isLast ? C.text : C.muted)..layout(maxWidth: slot - 4);
+      lt.paint(canvas, Offset(cx - lt.width / 2, size.height - lt.height));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TrendPainter old) => true;
+}

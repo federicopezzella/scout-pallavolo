@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'package:printing/printing.dart';
+
 import '../engine.dart';
 import '../models.dart';
+import '../pdf_report.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -15,6 +18,23 @@ class StatsScreen extends StatefulWidget {
 
 class _StatsScreenState extends State<StatsScreen> {
   int? _set; // null = tutta la partita
+  bool _making = false;
+
+  Future<void> _pdf(BuildContext btnContext) async {
+    setState(() => _making = true);
+    try {
+      final bytes = await buildMatchPdf(m);
+      final box = btnContext.findRenderObject() as RenderBox?;
+      final origin = box == null ? null : box.localToGlobal(Offset.zero) & box.size;
+      await Printing.sharePdf(bytes: bytes, filename: reportFileName(m), bounds: origin);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('PDF non creato: $e')));
+      }
+    } finally {
+      if (mounted) setState(() => _making = false);
+    }
+  }
 
   MatchData get m => widget.match;
 
@@ -74,7 +94,23 @@ class _StatsScreenState extends State<StatsScreen> {
 
     final selected = _set;
     return Scaffold(
-      appBar: AppBar(title: Text('Statistiche · vs ${m.opponent} · ${sum.setsUs}-${sum.setsThem}')),
+      appBar: AppBar(
+        title: Text('Statistiche · vs ${m.opponent} · ${sum.setsUs}-${sum.setsThem}', overflow: TextOverflow.ellipsis),
+        actions: [
+          Builder(
+            builder: (btnContext) => Padding(
+              padding: const EdgeInsets.only(right: 12),
+              child: FilledButton.icon(
+                onPressed: _making ? null : () => _pdf(btnContext),
+                icon: _making
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.picture_as_pdf),
+                label: const Text('Report PDF'),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: ListView(padding: const EdgeInsets.all(20), children: [
         Wrap(spacing: 8, runSpacing: 8, children: [
           ChoiceChip(label: const Text('Partita'), selected: _set == null, onSelected: (_) => setState(() => _set = null)),
