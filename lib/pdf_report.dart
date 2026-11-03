@@ -85,9 +85,9 @@ Future<Uint8List> buildMatchPdf(MatchData m) async {
         pw.NewPage(),
         b.sectionTitle('Giocatori', 'ordinati per punti'),
         pw.SizedBox(height: 8),
-        // 3 giocatori per pagina: ogni blocco ha altezza fissa e non viene spezzato
+        // 2 giocatori per pagina: ogni blocco ha altezza fissa e non viene spezzato
         for (var i = 0; i < r.players.length; i++) ...[
-          if (i > 0 && i % 3 == 0) pw.NewPage(),
+          if (i > 0 && i % 2 == 0) pw.NewPage(),
           b.playerBlock(r.players[i]),
           pw.SizedBox(height: 16),
         ],
