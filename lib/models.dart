@@ -304,13 +304,15 @@ class MatchData {
 class AppData {
   Team team;
   List<MatchData> matches;
+  int? lastBackup;
 
-  AppData({required this.team, required this.matches});
+  AppData({required this.team, required this.matches, this.lastBackup});
 
   Map<String, dynamic> toJson() => {
         'version': 1,
         'team': team.toJson(),
         'matches': matches.map((m) => m.toJson()).toList(),
+        if (lastBackup != null) 'lastBackup': lastBackup,
       };
 
   factory AppData.fromJson(Map<String, dynamic> j) => AppData(
@@ -318,5 +320,6 @@ class AppData {
         matches: (j['matches'] as List)
             .map((e) => MatchData.fromJson(e as Map<String, dynamic>))
             .toList(),
+        lastBackup: (j['lastBackup'] as num?)?.toInt(),
       );
 }

@@ -4,6 +4,7 @@ import '../engine.dart';
 import '../models.dart';
 import '../store.dart';
 import '../theme.dart';
+import 'backup.dart';
 import 'lineup.dart';
 import 'live.dart';
 import 'new_match.dart';
@@ -57,10 +58,18 @@ class HomeScreen extends StatelessWidget {
         final matches = List.of(store.data.matches)..sort((a, b) => b.date.compareTo(a.date));
         final running = matches.where((m) => !m.finished).toList();
         final done = matches.where((m) => m.finished).toList();
+        final last = store.data.lastBackup;
+        final needBackup = done.isNotEmpty &&
+            (last == null || DateTime.now().millisecondsSinceEpoch - last > const Duration(days: 7).inMilliseconds);
         return Scaffold(
           appBar: AppBar(
             title: const Text('Scout Volley', style: TextStyle(fontWeight: FontWeight.w800)),
             actions: [
+              TextButton.icon(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BackupScreen())),
+                icon: const Icon(Icons.save_alt),
+                label: const Text('Backup'),
+              ),
               TextButton.icon(
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RosterScreen())),
                 icon: const Icon(Icons.groups),
@@ -85,6 +94,23 @@ class HomeScreen extends StatelessWidget {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                   children: [
+                    if (needBackup)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Material(
+                          color: const Color(0xFF2A2320),
+                          borderRadius: BorderRadius.circular(12),
+                          child: ListTile(
+                            leading: const Icon(Icons.warning_amber_rounded, color: C.accent),
+                            title: Text(last == null ? 'Non hai ancora fatto un backup' : 'Ultimo backup: ${fmtDate(last)}'),
+                            subtitle: const Text('Esporta un file con le tue partite per non perderle'),
+                            trailing: FilledButton(
+                              onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BackupScreen())),
+                              child: const Text('Backup'),
+                            ),
+                          ),
+                        ),
+                      ),
                     if (running.isNotEmpty) ...[
                       const Text('IN CORSO', style: labelStyle),
                       const SizedBox(height: 8),
