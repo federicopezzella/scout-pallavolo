@@ -13,6 +13,8 @@ import 'new_match.dart';
 import 'roster.dart';
 import 'stats.dart';
 
+const appBuild = String.fromEnvironment('BUILD', defaultValue: 'dev');
+
 String fmtDate(int ms) {
   final d = DateTime.fromMillisecondsSinceEpoch(ms);
   String two(int v) => v.toString().padLeft(2, '0');
@@ -65,7 +67,14 @@ class HomeScreen extends StatelessWidget {
             (last == null || DateTime.now().millisecondsSinceEpoch - last > const Duration(days: 7).inMilliseconds);
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Scout Volley', style: TextStyle(fontWeight: FontWeight.w800)),
+            title: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              const Text('Scout Volley', style: TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(width: 8),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text('build $appBuild', style: const TextStyle(fontSize: 12, color: C.muted)),
+              ),
+            ]),
             actions: [
               TextButton.icon(
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const BackupScreen())),

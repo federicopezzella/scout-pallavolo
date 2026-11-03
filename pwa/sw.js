@@ -26,7 +26,14 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE);
-    const network = fetch(req).then((res) => {
+    // stesso sito: chiedi sempre al server se c'è una versione nuova (salta la cache HTTP del browser)
+    const sameOrigin = new URL(req.url).origin === self.location.origin;
+    const fresh = !sameOrigin
+      ? fetch(req)
+      : req.mode === 'navigate'
+        ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+        : fetch(req, { cache: 'no-cache' });
+    const network = fresh.then((res) => {
       if (res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
       return res;
     });
