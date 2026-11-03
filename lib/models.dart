@@ -144,7 +144,8 @@ class SetData {
   int number;
   /// 6 id: indice 0 = posizione 1 ... indice 5 = posizione 6
   List<String> lineup;
-  String? liberoId;
+  /// fino a 2 liberi per set; in campo ne va uno alla volta
+  List<String> liberoIds;
   bool weServeFirst;
   List<GameEvent> events;
   /// ruolo giocato in questo set (id giocatore -> 'P','S','C','O')
@@ -155,13 +156,15 @@ class SetData {
   SetData({
     required this.number,
     required this.lineup,
-    required this.liberoId,
+    String? liberoId,
+    List<String>? liberoIds,
     required this.weServeFirst,
     List<GameEvent>? events,
     Map<String, String>? roles,
     this.clockMs = 0,
     this.runningSince,
-  })  : events = events ?? [],
+  })  : liberoIds = liberoIds ?? (liberoId == null ? <String>[] : [liberoId]),
+        events = events ?? [],
         roles = roles ?? {};
 
   bool get running => runningSince != null;
@@ -188,7 +191,7 @@ class SetData {
   Map<String, dynamic> toJson() => {
         'number': number,
         'lineup': lineup,
-        'liberoId': liberoId,
+        'liberoIds': liberoIds,
         'weServeFirst': weServeFirst,
         'events': events.map((e) => e.toJson()).toList(),
         'roles': roles,
@@ -199,7 +202,8 @@ class SetData {
   factory SetData.fromJson(Map<String, dynamic> j) => SetData(
         number: (j['number'] as num).toInt(),
         lineup: (j['lineup'] as List).map((e) => e as String).toList(),
-        liberoId: j['liberoId'] as String?,
+        liberoIds: (j['liberoIds'] as List?)?.map((e) => e as String).toList() ??
+            [if (j['liberoId'] != null) j['liberoId'] as String],
         weServeFirst: j['weServeFirst'] as bool,
         events: (j['events'] as List)
             .map((e) => GameEvent.fromJson(e as Map<String, dynamic>))
@@ -251,7 +255,7 @@ class MatchData {
   /// Ruolo che il giocatore ricopre nel set (L se è il libero del set).
   String roleIn(SetData s, String? id) {
     if (id == null) return '';
-    if (id == s.liberoId) return 'L';
+    if (s.liberoIds.contains(id)) return 'L';
     final r = s.roles[id];
     if (r != null) return r;
     final p = player(id);

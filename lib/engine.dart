@@ -48,7 +48,8 @@ class SetState {
   int subsUsed = 0;
   int timeoutsUs = 0;
   int timeoutsThem = 0;
-  String? liberoReplaced;
+  String? liberoReplaced; // giocatore fuori per il libero
+  String? liberoIn; // quale libero è in campo
   final Map<String, String> subOf = {}; // riserva entrata -> titolare uscito
   final Map<String, String> starterReplacedBy = {}; // titolare -> riserva
   final Set<String> exitedSubs = {};
@@ -126,28 +127,42 @@ void _apply(MatchData m, SetData s, SetState st, GameEvent e) {
     case 'liberoIn':
       {
       final out = e.outId;
-      final lib = s.liberoId;
+      final lib = e.inId ?? (s.liberoIds.isEmpty ? null : s.liberoIds.first);
       if (out == null || lib == null || st.liberoReplaced != null) break;
       final idx = st.court.indexOf(out);
       if (idx < 0) break;
       st.court[idx] = lib;
       st.liberoReplaced = out;
+      st.liberoIn = lib;
       st.eventsLog.add(LogItem(e.t, 'L', 'Libero entra per ${m.nr(out)}'));
       }
       break;
     case 'liberoOut':
       _liberoOut(m, s, st, e.t);
       break;
+    case 'liberoSwap':
+      {
+        final cur = st.liberoIn;
+        final next = e.inId;
+        if (cur == null || next == null || next == cur || !s.liberoIds.contains(next)) break;
+        final idx = st.court.indexOf(cur);
+        if (idx < 0) break;
+        st.court[idx] = next;
+        st.liberoIn = next;
+        st.eventsLog.add(LogItem(e.t, 'L', 'Cambio libero: ${m.nr(next)} per ${m.nr(cur)}'));
+      }
+      break;
   }
 }
 
 void _liberoOut(MatchData m, SetData s, SetState st, int t) {
   final rep = st.liberoReplaced;
-  final lib = s.liberoId;
+  final lib = st.liberoIn;
   if (rep == null || lib == null) return;
   final idx = st.court.indexOf(lib);
   if (idx >= 0) st.court[idx] = rep;
   st.liberoReplaced = null;
+  st.liberoIn = null;
   st.eventsLog.add(LogItem(t, 'L', 'Libero esce, rientra ${m.nr(rep)}'));
 }
 
@@ -157,7 +172,7 @@ void _rotate(MatchData m, SetData s, SetState st, int t) {
     st.court[i] = old[(i + 1) % 6];
   }
   // il libero non può andare in prima linea (posizione 4 = indice 3)
-  if (st.liberoReplaced != null && st.court[3] == s.liberoId) {
+  if (st.liberoReplaced != null && st.court[3] == st.liberoIn) {
     _liberoOut(m, s, st, t);
   }
 }
@@ -192,14 +207,14 @@ void _checkEnd(SetState st) {
 List<Player> benchPlayers(MatchData m, SetData s, SetState st) => m.players
     .where((p) =>
         !st.court.contains(p.id) &&
-        p.id != s.liberoId &&
+        !s.liberoIds.contains(p.id) &&
         p.id != st.liberoReplaced)
     .toList();
 
 /// null se il cambio è valido, altrimenti il motivo
 String? canSub(MatchData m, SetData s, SetState st, String outId, String inId) {
   if (st.subsUsed >= m.maxSubs) return 'Cambi esauriti (${m.maxSubs} su ${m.maxSubs})';
-  if (outId == s.liberoId || inId == s.liberoId) {
+  if (s.liberoIds.contains(outId) || s.liberoIds.contains(inId)) {
     return 'Per il libero usa il pulsante Libero';
   }
   if (!st.court.contains(outId)) return '${m.nr(outId)} non è in campo';
@@ -228,7 +243,7 @@ String? canSub(MatchData m, SetData s, SetState st, String outId, String inId) {
 }
 
 String? canLiberoIn(SetData s, SetState st, String replacedId) {
-  if (s.liberoId == null) return 'Nessun libero in formazione';
+  if (s.liberoIds.isEmpty) return 'Nessun libero in formazione';
   if (st.liberoReplaced != null) return 'Il libero è già in campo';
   final idx = st.court.indexOf(replacedId);
   if (idx < 0) return 'Giocatore non in campo';

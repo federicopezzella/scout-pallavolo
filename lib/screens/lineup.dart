@@ -17,7 +17,7 @@ class LineupScreen extends StatefulWidget {
 
 class _LineupScreenState extends State<LineupScreen> {
   late List<String?> _slots; // indice 0 = posizione 1
-  String? _libero;
+  final List<String> _liberos = []; // al massimo 2
   bool _weServe = true;
   final Map<String, String> _roles = {};
 
@@ -30,19 +30,19 @@ class _LineupScreenState extends State<LineupScreen> {
     if (m.sets.isNotEmpty) {
       final prev = m.sets.last;
       _slots = List<String?>.from(prev.lineup);
-      _libero = prev.liberoId;
+      _liberos.addAll(prev.liberoIds);
       _weServe = !prev.weServeFirst; // di solito si alterna
       _roles.addAll(prev.roles);
     } else {
       _slots = List<String?>.filled(6, null);
       final only = m.players.where((p) => p.onlyLibero).toList();
       final libs = only.isNotEmpty ? only : m.players.where((p) => p.canLibero).toList();
-      _libero = libs.isEmpty ? null : libs.first.id;
+      _liberos.addAll(libs.take(2).map((p) => p.id));
     }
   }
 
   Future<void> _pick(int idx) async {
-    final used = {..._slots.whereType<String>(), if (_libero != null) _libero!};
+    final used = {..._slots.whereType<String>(), ..._liberos};
     final current = _slots[idx];
     final options = m.players
         .where((p) => p.fieldRoles.isNotEmpty && (p.id == current || !used.contains(p.id)))
@@ -112,7 +112,7 @@ class _LineupScreenState extends State<LineupScreen> {
     final s = SetData(
       number: setNumber,
       lineup: _slots.map((e) => e!).toList(),
-      liberoId: _libero,
+      liberoIds: List.of(_liberos),
       weServeFirst: _weServe,
       roles: {
         for (final id in _slots.whereType<String>())
@@ -188,27 +188,37 @@ class _LineupScreenState extends State<LineupScreen> {
           Expanded(
             flex: 2,
             child: ListView(children: [
-              const Text('LIBERO', style: labelStyle),
+              const Text('LIBERI (FINO A 2)', style: labelStyle),
               const SizedBox(height: 4),
-              const Text('Chi ha il ruolo libero nella rosa. Da libero indossa la divisa del libero.',
+              const Text('Chi ha il ruolo libero nella rosa, al massimo due. In campo ne entra uno alla volta, con la divisa del libero.',
                   style: TextStyle(color: C.muted, fontSize: 13)),
               const SizedBox(height: 8),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 ChoiceChip(
                   label: const Text('Nessuno'),
-                  selected: _libero == null,
-                  onSelected: (_) => setState(() => _libero = null),
+                  selected: _liberos.isEmpty,
+                  onSelected: (_) => setState(_liberos.clear),
                 ),
                 for (final p in libCandidates)
-                  ChoiceChip(
+                  FilterChip(
                     avatar: CircleAvatar(
                       backgroundColor: Color(m.liberoColor),
                       child: Text('${p.number}',
                           style: TextStyle(fontSize: 12, color: isLight(Color(m.liberoColor)) ? C.bg : Colors.white)),
                     ),
                     label: Text(p.name),
-                    selected: _libero == p.id,
-                    onSelected: (_) => setState(() => _libero = p.id),
+                    selected: _liberos.contains(p.id),
+                    onSelected: (v) => setState(() {
+                      if (!v) {
+                        _liberos.remove(p.id);
+                      } else if (_liberos.length < 2) {
+                        _liberos.add(p.id);
+                      } else {
+                        _liberos
+                          ..removeAt(0)
+                          ..add(p.id);
+                      }
+                    }),
                   ),
               ]),
               const SizedBox(height: 24),

@@ -55,7 +55,7 @@ MatchData sampleMatch() {
     final s = SetData(
       number: setN,
       lineup: ['a', 'b', 'c', 'd', 'e', 'f'],
-      liberoId: 'g',
+      liberoIds: ['g', 'h'],
       weServeFirst: setN.isOdd,
       clockMs: 0,
     );

@@ -89,14 +89,14 @@ class _LiveScreenState extends State<LiveScreen> {
     setState(() {});
   }
 
-  Color _jerseyColor(String id) => Color(id == s.liberoId ? m.liberoColor : m.jerseyColor);
+  Color _jerseyColor(String id) => Color(s.liberoIds.contains(id) ? m.liberoColor : m.jerseyColor);
 
   // ---------------------------------------------------------------- dialoghi
 
   Future<void> _subsDialog(SetState st) async {
     String? out;
     String? inn;
-    final onCourt = st.court.where((id) => id != s.liberoId).toList();
+    final onCourt = st.court.where((id) => !s.liberoIds.contains(id)).toList();
     final bench = benchPlayers(m, s, st);
     await showDialog<void>(
       context: context,
@@ -204,19 +204,29 @@ class _LiveScreenState extends State<LiveScreen> {
   }
 
   Future<void> _liberoDialog(SetState st) async {
-    if (s.liberoId == null) {
+    if (s.liberoIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Nessun libero in formazione per questo set')));
       return;
     }
+    String who(String? id) => '${m.nr(id)} ${m.player(id)?.name ?? ''}'.trim();
     await showDialog<void>(
       context: context,
       builder: (ctx) {
         if (st.liberoOnCourt) {
+          final other = s.liberoIds.where((id) => id != st.liberoIn).toList();
           return AlertDialog(
-            title: Text('Libero in campo per ${m.nr(st.liberoReplaced)}'),
+            title: Text('Libero ${who(st.liberoIn)} in campo per ${m.nr(st.liberoReplaced)}'),
             content: const Text('Gli ingressi del libero non contano come cambi.'),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Chiudi')),
+              for (final o in other)
+                OutlinedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    _add('liberoSwap', outId: st.liberoIn, inId: o);
+                  },
+                  child: Text('Entra l\'altro libero ${who(o)}'),
+                ),
               FilledButton(
                 onPressed: () {
                   Navigator.pop(ctx);
@@ -227,25 +237,50 @@ class _LiveScreenState extends State<LiveScreen> {
             ],
           );
         }
+        var lib = s.liberoIds.first;
         final options = st.court.where((id) => canLiberoIn(s, st, id) == null).toList();
-        return AlertDialog(
-          title: const Text('Il libero entra al posto di…'),
-          content: SizedBox(
-            width: 420,
-            child: options.isEmpty
-                ? const Text('Nessun giocatore di seconda linea sostituibile ora.')
-                : Wrap(spacing: 10, runSpacing: 10, children: [
-                    for (final id in options)
-                      ActionChip(
-                        label: Text('${m.nr(id)} ${m.player(id)?.name ?? ''} · pos ${st.court.indexOf(id) + 1}'),
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _add('liberoIn', outId: id);
-                        },
+        return StatefulBuilder(
+          builder: (ctx, setD) => AlertDialog(
+            title: const Text('Entra il libero'),
+            content: SizedBox(
+              width: 440,
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                if (s.liberoIds.length > 1) ...[
+                  const Text('QUALE LIBERO', style: labelStyle),
+                  const SizedBox(height: 8),
+                  Wrap(spacing: 8, children: [
+                    for (final id in s.liberoIds)
+                      ChoiceChip(
+                        avatar: CircleAvatar(
+                          backgroundColor: Color(m.liberoColor),
+                          child: Text('${m.player(id)?.number ?? ''}',
+                              style: TextStyle(fontSize: 12, color: isLight(Color(m.liberoColor)) ? C.bg : Colors.white)),
+                        ),
+                        label: Text(m.player(id)?.name ?? '?'),
+                        selected: lib == id,
+                        onSelected: (_) => setD(() => lib = id),
                       ),
                   ]),
+                  const SizedBox(height: 16),
+                ],
+                const Text('AL POSTO DI', style: labelStyle),
+                const SizedBox(height: 8),
+                options.isEmpty
+                    ? const Text('Nessun giocatore di seconda linea sostituibile ora.')
+                    : Wrap(spacing: 10, runSpacing: 10, children: [
+                        for (final id in options)
+                          ActionChip(
+                            label: Text('${who(id)} · pos ${st.court.indexOf(id) + 1}'),
+                            onPressed: () {
+                              Navigator.pop(ctx);
+                              _add('liberoIn', outId: id, inId: lib);
+                            },
+                          ),
+                      ]),
+              ]),
+            ),
+            actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annulla'))],
           ),
-          actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annulla'))],
         );
       },
     );

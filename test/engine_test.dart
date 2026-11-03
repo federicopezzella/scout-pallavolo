@@ -100,4 +100,28 @@ void main() {
     m.maxSubs = 6;
     expect(canSub(m, s, replaySet(m, s), 'q12', 'p3'), isNotNull);
   });
+
+  test('due liberi: entra il secondo, cambio libero, uscita in rotazione', () {
+    final m = _match()..players.add(Player(id: 'p10', number: 10, name: 'L2', roles: ['L']));
+    final s = SetData(number: 1, lineup: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'], liberoIds: ['p9', 'p10'], weServeFirst: false);
+    s.events.add(const GameEvent(type: 'liberoIn', t: 0, outId: 'p5', inId: 'p10'));
+    var st = replaySet(m, s);
+    expect(st.court[4], 'p10');
+    expect(m.roleIn(s, 'p10'), 'L');
+    s.events.add(const GameEvent(type: 'liberoSwap', t: 0, outId: 'p10', inId: 'p9'));
+    st = replaySet(m, s);
+    expect(st.court[4], 'p9');
+    expect(st.liberoIn, 'p9');
+    expect(benchPlayers(m, s, st).any((p) => p.id == 'p10' || p.id == 'p5'), false);
+    s.events.add(const GameEvent(type: 'pointUs', t: 0));
+    st = replaySet(m, s);
+    expect(st.court[3], 'p5');
+    expect(st.liberoOnCourt, false);
+    expect(canSub(m, s, st, 'p5', 'p10'), isNotNull);
+  });
+
+  test('vecchio formato con un solo libero', () {
+    final s = SetData.fromJson({'number': 1, 'lineup': ['a', 'b', 'c', 'd', 'e', 'f'], 'liberoId': 'x', 'weServeFirst': true, 'events': []});
+    expect(s.liberoIds, ['x']);
+  });
 }
