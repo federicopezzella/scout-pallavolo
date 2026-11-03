@@ -124,4 +124,40 @@ void main() {
     final s = SetData.fromJson({'number': 1, 'lineup': ['a', 'b', 'c', 'd', 'e', 'f'], 'liberoId': 'x', 'weServeFirst': true, 'events': []});
     expect(s.liberoIds, ['x']);
   });
+
+  test('schieramento dopo che la palla passa di là', () {
+    final players = [
+      Player(id: 'P', number: 1, name: 'Pal', roles: ['P']),
+      Player(id: 'S1', number: 2, name: 'Sch1', roles: ['S']),
+      Player(id: 'C1', number: 3, name: 'Cen1', roles: ['C']),
+      Player(id: 'O', number: 4, name: 'Opp', roles: ['O']),
+      Player(id: 'S2', number: 5, name: 'Sch2', roles: ['S']),
+      Player(id: 'C2', number: 6, name: 'Cen2', roles: ['C']),
+    ];
+    final m = MatchData(id: 'm', opponent: 'x', competition: '', home: true, date: 0, teamName: 'n',
+        jerseyColor: 0, liberoColor: 0, players: players);
+    // pos1 P, pos2 S1, pos3 C1, pos4 O, pos5 S2, pos6 C2
+    final s = SetData(number: 1, lineup: ['P', 'S1', 'C1', 'O', 'S2', 'C2'], weServeFirst: false);
+    var st = replaySet(m, s);
+    expect(st.switched, false);
+    expect(displayOrder(m, s, st), [3, 2, 1, 4, 5, 0]);
+    // in ricezione: ricezione e alzata non spostano nessuno
+    s.events.add(const GameEvent(type: 'action', t: 0, playerId: 'S2', skill: 'Ricezione', grade: '+'));
+    s.events.add(const GameEvent(type: 'action', t: 0, playerId: 'P', skill: 'Alzata', grade: '+'));
+    expect(replaySet(m, s).switched, false);
+    // attacco: la palla passa, si va in schieramento
+    s.events.add(const GameEvent(type: 'action', t: 0, playerId: 'O', skill: 'Attacco', grade: '+'));
+    st = replaySet(m, s);
+    expect(st.switched, true);
+    final order = displayOrder(m, s, st).map((i) => st.court[i]).toList();
+    // prima linea: S1 sx, C1 centro, O dx; seconda: C2 sx, S2 centro, P dx
+    expect(order, ['S1', 'C1', 'O', 'C2', 'S2', 'P']);
+    // punto: si torna in rotazione
+    s.events.add(const GameEvent(type: 'pointUs', t: 0));
+    st = replaySet(m, s);
+    expect(st.switched, false);
+    // ora battiamo noi: dopo la battuta schieramento subito
+    s.events.add(GameEvent(type: 'action', t: 0, playerId: st.court[0], skill: 'Battuta', grade: '!'));
+    expect(replaySet(m, s).switched, true);
+  });
 }

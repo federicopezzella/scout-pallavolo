@@ -58,8 +58,15 @@ class SetState {
   final List<SetMarker> markers = [];
   final List<LogItem> eventsLog = [];
   bool finished = false;
+  /// indice del primo evento dello scambio in corso
+  int rallyStart = 0;
+  /// se battevamo noi all'inizio dello scambio in corso
+  bool rallyWeServe;
+  /// la palla è già passata nel campo avversario in questo scambio:
+  /// i giocatori sono nelle posizioni di gioco (schieramento), non di rotazione
+  bool switched = false;
 
-  SetState(this.court, this.weServe, this.target);
+  SetState(this.court, this.weServe, this.target) : rallyWeServe = weServe;
 
   bool get weWon => finished && us > them;
   bool get liberoOnCourt => liberoReplaced != null;
@@ -67,10 +74,55 @@ class SetState {
 
 SetState replaySet(MatchData m, SetData s) {
   final st = SetState(List.of(s.lineup), s.weServeFirst, s.number == 5 ? 15 : 25);
-  for (final e in s.events) {
-    _apply(m, s, st, e);
+  for (var i = 0; i < s.events.length; i++) {
+    final before = st.us + st.them;
+    _apply(m, s, st, s.events[i]);
+    if (st.us + st.them != before) {
+      st.rallyStart = i + 1;
+      st.rallyWeServe = st.weServe;
+    }
+  }
+  if (!st.finished) {
+    for (final e in s.events.skip(st.rallyStart)) {
+      if (e.type != 'action') continue;
+      if (st.rallyWeServe || e.skill == 'Attacco' || e.skill == 'Muro') {
+        st.switched = true;
+        break;
+      }
+    }
   }
   return st;
+}
+
+/// Ordine di visualizzazione di una linea [sinistra, centro, destra].
+/// [row] sono gli indici di rotazione della linea da sinistra a destra,
+/// [prefer] dice per ogni ruolo in che colonna va (0 sx, 1 centro, 2 dx).
+List<int> arrangeRow(MatchData m, SetData s, List<String> court, List<int> row, Map<String, int> prefer) {
+  final slots = List<int?>.filled(3, null);
+  final rest = <int>[];
+  for (final idx in row) {
+    final want = prefer[m.roleIn(s, court[idx])];
+    if (want != null && slots[want] == null) {
+      slots[want] = idx;
+    } else {
+      rest.add(idx);
+    }
+  }
+  for (var k = 0; k < 3; k++) {
+    if (slots[k] == null && rest.isNotEmpty) slots[k] = rest.removeAt(0);
+  }
+  return slots.whereType<int>().toList();
+}
+
+/// Indici di rotazione nell'ordine in cui disegnarli: prima linea sx→dx, poi seconda linea sx→dx.
+List<int> displayOrder(MatchData m, SetData s, SetState st) {
+  const front = [3, 2, 1]; // pos 4, 3, 2
+  const back = [4, 5, 0]; // pos 5, 6, 1
+  if (!st.switched) return [...front, ...back];
+  return [
+    ...arrangeRow(m, s, st.court, front, const {'S': 0, 'C': 1, 'O': 2, 'P': 2}),
+    ...arrangeRow(m, s, st.court, back, const {'L': 0, 'C': 0, 'S': 1, 'O': 2, 'P': 2}),
+  ];
 }
 
 void _apply(MatchData m, SetData s, SetState st, GameEvent e) {

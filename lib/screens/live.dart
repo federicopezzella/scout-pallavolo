@@ -496,7 +496,7 @@ class _LiveScreenState extends State<LiveScreen> {
 
   Widget _courtPanel(SetState st, {bool oneRowButtons = false}) {
     final setterIdx = st.court.indexWhere((id) => m.roleIn(s, id) == 'P');
-    const order = [3, 2, 1, 4, 5, 0]; // 4 3 2 / 5 6 1
+    final order = displayOrder(m, s, st); // ricezione: 4 3 2 / 5 6 1, poi schieramento
     Widget tile(int idx) {
       final id = st.court[idx];
       final p = m.player(id);
@@ -567,6 +567,13 @@ class _LiveScreenState extends State<LiveScreen> {
       Row(children: [
         const Text('1 · GIOCATORE', style: labelStyle),
         const Spacer(),
+        if (st.switched)
+          Container(
+            margin: const EdgeInsets.only(right: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(color: C.accent.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(6)),
+            child: const Text('SCHIERAMENTO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.accent)),
+          ),
         Text(setterIdx >= 0 ? 'Rotazione P${setterIdx + 1}' : '', style: const TextStyle(color: C.muted)),
       ]),
       const SizedBox(height: 6),
