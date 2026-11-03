@@ -3,16 +3,33 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'models.dart';
 
-/// Tutti i dati in un file JSON locale, salvato a ogni modifica.
+/// Tutti i dati in un JSON locale, salvato a ogni modifica:
+/// file su Android/iOS, memoria del browser (localStorage) nella webapp.
 class AppStore extends ChangeNotifier {
+  static const _webKey = 'scout_data';
   AppData data = AppData(team: Team.empty(), matches: []);
   File? _file;
+  SharedPreferences? _prefs;
   Future<void> _pending = Future.value();
 
   Future<void> load() async {
+    if (kIsWeb) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        _prefs = prefs;
+        final txt = prefs.getString(_webKey);
+        if (txt != null) {
+          data = AppData.fromJson(jsonDecode(txt) as Map<String, dynamic>);
+        }
+      } catch (e) {
+        debugPrint('Errore lettura dati web: $e');
+      }
+      return;
+    }
     try {
       final dir = await getApplicationDocumentsDirectory();
       final f = File('${dir.path}/scout_data.json');
@@ -39,6 +56,14 @@ class AppStore extends ChangeNotifier {
   }
 
   Future<void> _write() async {
+    if (kIsWeb) {
+      try {
+        await _prefs?.setString(_webKey, jsonEncode(data.toJson()));
+      } catch (e) {
+        debugPrint('Errore salvataggio web: $e');
+      }
+      return;
+    }
     final f = _file;
     if (f == null) return;
     try {

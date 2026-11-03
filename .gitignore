@@ -12,3 +12,4 @@ build/
 *.jks
 android/
 pubspec.lock
+web/

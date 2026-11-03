@@ -1,4 +1,4 @@
-name: Build APK e IPA
+name: Build APK, IPA e webapp
 
 on:
   push:
@@ -7,6 +7,12 @@ on:
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   android:
@@ -95,6 +101,44 @@ jobs:
         with:
           name: ipa
           path: scout-volley-${{ github.run_number }}.ipa
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Genera la parte web (solo i file mancanti)
+        run: |
+          flutter create --platforms=web --org it.scoutvolley --project-name scout_pallavolo .
+          rm -f test/widget_test.dart
+          python3 pwa/patch_web.py pre
+
+      - run: flutter pub get
+
+      - name: Build web
+        run: flutter build web --release --base-href /scout-pallavolo/ --no-web-resources-cdn
+
+      - name: Service worker per l'uso offline
+        run: python3 pwa/patch_web.py post ${{ github.run_number }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  pages:
+    needs: web
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
 
   release:
     needs: [android, ios]
