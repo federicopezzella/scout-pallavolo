@@ -105,6 +105,8 @@ class GameEvent {
   final String? team; // 'us' | 'them'
   final String? outId;
   final String? inId;
+  /// +1 / -1 per le correzioni manuali (punteggio e rotazione)
+  final int? delta;
 
   const GameEvent({
     required this.type,
@@ -115,6 +117,7 @@ class GameEvent {
     this.team,
     this.outId,
     this.inId,
+    this.delta,
   });
 
   Map<String, dynamic> toJson() => {
@@ -126,6 +129,7 @@ class GameEvent {
         if (team != null) 'team': team,
         if (outId != null) 'outId': outId,
         if (inId != null) 'inId': inId,
+        if (delta != null) 'delta': delta,
       };
 
   factory GameEvent.fromJson(Map<String, dynamic> j) => GameEvent(
@@ -137,6 +141,7 @@ class GameEvent {
         team: j['team'] as String?,
         outId: j['outId'] as String?,
         inId: j['inId'] as String?,
+        delta: (j['delta'] as num?)?.toInt(),
       );
 }
 

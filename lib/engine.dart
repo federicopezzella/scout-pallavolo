@@ -58,6 +58,8 @@ class SetState {
   final List<SetMarker> markers = [];
   final List<LogItem> eventsLog = [];
   bool finished = false;
+  /// rotazione avversaria 0..5 (mostrata come 1..6): avanza quando conquistano la battuta
+  int themRot = 0;
   /// indice del primo evento dello scambio in corso
   int rallyStart = 0;
   /// se battevamo noi all'inizio dello scambio in corso
@@ -77,7 +79,7 @@ SetState replaySet(MatchData m, SetData s) {
   for (var i = 0; i < s.events.length; i++) {
     final before = st.us + st.them;
     _apply(m, s, st, s.events[i]);
-    if (st.us + st.them != before) {
+    if (st.us + st.them != before || s.events[i].type == 'rot') {
       st.rallyStart = i + 1;
       st.rallyWeServe = st.weServe;
     }
@@ -192,6 +194,41 @@ void _apply(MatchData m, SetData s, SetState st, GameEvent e) {
     case 'liberoOut':
       _liberoOut(m, s, st, e.t);
       break;
+    case 'adj':
+      {
+        // correzione manuale del punteggio: non fa ruotare nessuno
+        final d = e.delta ?? 0;
+        final ours = e.team == 'us';
+        if (d == 0) break;
+        if (ours) {
+          if (st.us + d < 0) break;
+          st.us += d;
+          if (d > 0) st.weServe = true;
+        } else {
+          if (st.them + d < 0) break;
+          st.them += d;
+          if (d > 0) st.weServe = false;
+        }
+        st.timeline.add(ScorePoint(e.t, st.us, st.them));
+        st.finished = _isEnd(st);
+        final sgn = d > 0 ? '+1' : '−1';
+        st.eventsLog.add(LogItem(e.t, 'M', 'Punteggio ${ours ? 'noi' : 'avv.'} $sgn (${st.us}-${st.them})'));
+      }
+      break;
+    case 'rot':
+      {
+        final d = e.delta ?? 0;
+        if (d == 0) break;
+        final ours = e.team == 'us';
+        if (ours) {
+          _rotate(m, s, st, e.t, back: d < 0);
+        } else {
+          st.themRot = (st.themRot + d) % 6;
+          if (st.themRot < 0) st.themRot += 6;
+        }
+        st.eventsLog.add(LogItem(e.t, 'M', 'Rotazione ${ours ? 'noi' : 'avv.'} ${d > 0 ? 'avanti' : 'indietro'} di un giro'));
+      }
+      break;
     case 'liberoSwap':
       {
         final cur = st.liberoIn;
@@ -218,14 +255,16 @@ void _liberoOut(MatchData m, SetData s, SetState st, int t) {
   st.eventsLog.add(LogItem(t, 'L', 'Libero esce, rientra ${m.nr(rep)}'));
 }
 
-void _rotate(MatchData m, SetData s, SetState st, int t) {
+void _rotate(MatchData m, SetData s, SetState st, int t, {bool back = false}) {
   final old = List.of(st.court);
   for (var i = 0; i < 6; i++) {
-    st.court[i] = old[(i + 1) % 6];
+    st.court[i] = old[(i + (back ? 5 : 1)) % 6];
   }
-  // il libero non può andare in prima linea (posizione 4 = indice 3)
-  if (st.liberoReplaced != null && st.court[3] == st.liberoIn) {
-    _liberoOut(m, s, st, t);
+  // il libero non può stare in prima linea (posizioni 2, 3, 4 = indici 1, 2, 3)
+  final lib = st.liberoIn;
+  if (st.liberoReplaced != null && lib != null) {
+    final idx = st.court.indexOf(lib);
+    if (idx >= 1 && idx <= 3) _liberoOut(m, s, st, t);
   }
 }
 
@@ -243,16 +282,17 @@ void _pointUs(MatchData m, SetData s, SetState st, int t) {
 void _pointThem(SetState st, int t) {
   if (st.finished) return;
   st.them++;
+  if (st.weServe) st.themRot = (st.themRot + 1) % 6; // cambio palla: ruotano loro
   st.weServe = false;
   st.timeline.add(ScorePoint(t, st.us, st.them));
   _checkEnd(st);
 }
 
+bool _isEnd(SetState st) =>
+    (st.us >= st.target || st.them >= st.target) && (st.us - st.them).abs() >= 2;
+
 void _checkEnd(SetState st) {
-  if ((st.us >= st.target || st.them >= st.target) &&
-      (st.us - st.them).abs() >= 2) {
-    st.finished = true;
-  }
+  if (_isEnd(st)) st.finished = true;
 }
 
 /// Giocatori disponibili in panchina (esclusi libero e chi è fuori per il libero)

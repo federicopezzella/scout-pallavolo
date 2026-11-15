@@ -160,4 +160,59 @@ void main() {
     s.events.add(GameEvent(type: 'action', t: 0, playerId: st.court[0], skill: 'Battuta', grade: '!'));
     expect(replaySet(m, s).switched, true);
   });
+
+  test('correzioni manuali: punteggio e rotazioni', () {
+    final m = _match();
+    final s = SetData(number: 1, lineup: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'], liberoIds: ['p9'], weServeFirst: false);
+    // +1 a noi: punto e battuta, ma nessuna rotazione
+    s.events.add(const GameEvent(type: 'adj', t: 0, team: 'us', delta: 1));
+    var st = replaySet(m, s);
+    expect(st.us, 1);
+    expect(st.weServe, true);
+    expect(st.court.first, 'p1');
+    // -1: torna a zero, sotto zero non va
+    s.events.add(const GameEvent(type: 'adj', t: 0, team: 'us', delta: -1));
+    s.events.add(const GameEvent(type: 'adj', t: 0, team: 'us', delta: -1));
+    expect(replaySet(m, s).us, 0);
+    // giro avanti e indietro per noi
+    s.events.add(const GameEvent(type: 'rot', t: 0, team: 'us', delta: 1));
+    expect(replaySet(m, s).court.first, 'p2');
+    s.events.add(const GameEvent(type: 'rot', t: 0, team: 'us', delta: -1));
+    s.events.add(const GameEvent(type: 'rot', t: 0, team: 'us', delta: -1));
+    expect(replaySet(m, s).court.first, 'p6');
+    // avversari: indietro da R1 va a R6, avanti torna a R1
+    s.events.add(const GameEvent(type: 'rot', t: 0, team: 'them', delta: -1));
+    expect(replaySet(m, s).themRot, 5);
+    s.events.add(const GameEvent(type: 'rot', t: 0, team: 'them', delta: 1));
+    expect(replaySet(m, s).themRot, 0);
+  });
+
+  test('rotazione avversaria automatica e libero che esce con il giro indietro', () {
+    final m = _match();
+    final s = SetData(number: 1, lineup: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'], liberoIds: ['p9'], weServeFirst: true);
+    s.events.add(const GameEvent(type: 'pointThem', t: 0)); // cambio palla per loro
+    expect(replaySet(m, s).themRot, 1);
+    s.events.add(const GameEvent(type: 'pointThem', t: 0)); // battevano già loro
+    expect(replaySet(m, s).themRot, 1);
+    // libero al posto del giocatore in pos 1 (loro battono): giro indietro lo porta in pos 2 -> esce
+    s.events.add(const GameEvent(type: 'liberoIn', t: 0, outId: 'p1', inId: 'p9'));
+    expect(replaySet(m, s).liberoOnCourt, true);
+    s.events.add(const GameEvent(type: 'rot', t: 0, team: 'us', delta: -1));
+    final st = replaySet(m, s);
+    expect(st.liberoOnCourt, false);
+    expect(st.court[1], 'p1');
+  });
+
+  test('correzione dopo fine set riapre il set', () {
+    final m = _match();
+    final s = SetData(number: 1, lineup: ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'], weServeFirst: true);
+    for (var i = 0; i < 25; i++) {
+      s.events.add(const GameEvent(type: 'pointUs', t: 0));
+    }
+    expect(replaySet(m, s).finished, true);
+    s.events.add(const GameEvent(type: 'adj', t: 0, team: 'us', delta: -1));
+    expect(replaySet(m, s).finished, false);
+    s.events.add(const GameEvent(type: 'adj', t: 0, team: 'us', delta: 1));
+    expect(replaySet(m, s).finished, true);
+  });
 }

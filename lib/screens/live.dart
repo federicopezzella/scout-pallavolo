@@ -41,7 +41,8 @@ class _LiveScreenState extends State<LiveScreen> {
     super.dispose();
   }
 
-  void _add(String type, {String? playerId, String? skill, String? grade, String? team, String? outId, String? inId}) {
+  void _add(String type,
+      {String? playerId, String? skill, String? grade, String? team, String? outId, String? inId, int? delta}) {
     final before = replaySet(m, s);
     final scoring = type == 'action' || type == 'pointUs' || type == 'pointThem';
     if (before.finished && scoring) return;
@@ -52,7 +53,8 @@ class _LiveScreenState extends State<LiveScreen> {
         s.roles[inId] = pin.fieldRoles.contains(outRole) ? outRole : pin.fieldRoles.first;
       }
     }
-    s.start();
+    final manual = type == 'adj' || type == 'rot';
+    if (!manual) s.start(); // le correzioni non fanno partire il cronometro
     s.events.add(GameEvent(
       type: type,
       t: s.elapsedSec(),
@@ -62,6 +64,7 @@ class _LiveScreenState extends State<LiveScreen> {
       team: team,
       outId: outId,
       inId: inId,
+      delta: delta,
     ));
     final after = replaySet(m, s);
     if (after.finished) s.pause();
@@ -286,6 +289,123 @@ class _LiveScreenState extends State<LiveScreen> {
     );
   }
 
+  /// Correzioni manuali: punteggio +/− e rotazione avanti/indietro per ogni squadra.
+  Future<void> _manualDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setD) {
+        final st = replaySet(m, s);
+        final narrow = MediaQuery.sizeOf(ctx).width < 700;
+        void act(String type, String team, int delta) {
+          _add(type, team: team, delta: delta);
+          setD(() {});
+        }
+
+        Widget roundBtn(IconData icon, String tip, VoidCallback? onTap) => SizedBox(
+              width: 64,
+              height: 64,
+              child: IconButton.filledTonal(
+                tooltip: tip,
+                iconSize: 32,
+                onPressed: onTap,
+                icon: Icon(icon),
+              ),
+            );
+
+        Widget column(String team) {
+          final ours = team == 'us';
+          final score = ours ? st.us : st.them;
+          final name = ours ? m.teamName : m.opponent;
+          final String rotText;
+          if (ours) {
+            final server = st.court[0];
+            rotText = 'In battuta (pos 1): ${m.nr(server)} ${m.player(server)?.name ?? ''}';
+          } else {
+            rotText = 'Rotazione ${st.themRot + 1}';
+          }
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: C.surface2,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: ours ? C.accent : C.border),
+            ),
+            child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              Text(name.toUpperCase(),
+                  textAlign: TextAlign.center, overflow: TextOverflow.ellipsis, style: labelStyle),
+              const SizedBox(height: 12),
+              const Text('PUNTEGGIO', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: C.muted)),
+              const SizedBox(height: 6),
+              Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                roundBtn(Icons.remove, 'Togli un punto', score > 0 ? () => act('adj', team, -1) : null),
+                SizedBox(
+                  width: 90,
+                  child: Text('$score', textAlign: TextAlign.center, style: cond(52, color: ours ? C.text : const Color(0xFFC4CFDA))),
+                ),
+                roundBtn(Icons.add, 'Aggiungi un punto', () => act('adj', team, 1)),
+              ]),
+              const SizedBox(height: 18),
+              const Text('ROTAZIONE', textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: C.muted)),
+              const SizedBox(height: 4),
+              Text(rotText, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      onPressed: () => act('rot', team, -1),
+                      icon: const Icon(Icons.rotate_left),
+                      label: const Text('Giro indietro'),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: SizedBox(
+                    height: 50,
+                    child: OutlinedButton.icon(
+                      onPressed: () => act('rot', team, 1),
+                      icon: const Icon(Icons.rotate_right),
+                      label: const Text('Giro avanti'),
+                    ),
+                  ),
+                ),
+              ]),
+            ]),
+          );
+        }
+
+        return AlertDialog(
+          insetPadding: const EdgeInsets.all(16),
+          title: Text('Modifica manuale · Set ${s.number}'),
+          content: SizedBox(
+            width: narrow ? MediaQuery.sizeOf(ctx).width - 64 : 640,
+            child: SingleChildScrollView(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                Flex(
+                  direction: narrow ? Axis.vertical : Axis.horizontal,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: narrow
+                      ? [column('us'), const SizedBox(height: 12), column('them')]
+                      : [Expanded(child: column('us')), const SizedBox(width: 12), Expanded(child: column('them'))],
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Le correzioni non fanno ruotare nessuno da sole: se serve, usa i pulsanti di rotazione. '
+                  'Chi riceve un punto con + prende la battuta. Ogni correzione si può togliere con Annulla.',
+                  style: TextStyle(color: C.muted, fontSize: 13),
+                ),
+              ]),
+            ),
+          ),
+          actions: [FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('Fatto'))],
+        );
+      }),
+    );
+  }
+
   Future<void> _endMatch() async {
     s.pause();
     m.finished = true;
@@ -436,14 +556,24 @@ class _LiveScreenState extends State<LiveScreen> {
         st.timeoutsUs < 2 && !st.finished ? () => _add('timeout', team: 'us') : null);
     final toThem = btn(compact ? 'TO avv ${st.timeoutsThem}' : 'TO avv ${st.timeoutsThem}/2',
         st.timeoutsThem < 2 && !st.finished ? () => _add('timeout', team: 'them') : null);
-    final undo = Padding(
-      padding: const EdgeInsets.only(left: 6),
-      child: IconButton.outlined(
-        tooltip: 'Annulla ultima azione',
-        onPressed: s.events.isEmpty ? null : _undo,
-        icon: const Icon(Icons.undo),
+    final undo = Row(mainAxisSize: MainAxisSize.min, children: [
+      Padding(
+        padding: const EdgeInsets.only(left: 6),
+        child: IconButton.outlined(
+          tooltip: 'Modifica punteggio e rotazione',
+          onPressed: _manualDialog,
+          icon: const Icon(Icons.edit),
+        ),
       ),
-    );
+      Padding(
+        padding: const EdgeInsets.only(left: 6),
+        child: IconButton.outlined(
+          tooltip: 'Annulla ultima azione',
+          onPressed: s.events.isEmpty ? null : _undo,
+          icon: const Icon(Icons.undo),
+        ),
+      ),
+    ]);
     final menu = PopupMenuButton<String>(
       tooltip: 'Altro',
       onSelected: (v) {
@@ -574,7 +704,8 @@ class _LiveScreenState extends State<LiveScreen> {
             decoration: BoxDecoration(color: C.accent.withValues(alpha: 0.18), borderRadius: BorderRadius.circular(6)),
             child: const Text('SCHIERAMENTO', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: C.accent)),
           ),
-        Text(setterIdx >= 0 ? 'Rotazione P${setterIdx + 1}' : '', style: const TextStyle(color: C.muted)),
+        Text('${setterIdx >= 0 ? 'Rotazione P${setterIdx + 1} · ' : ''}Avv. R${st.themRot + 1}',
+            style: const TextStyle(color: C.muted)),
       ]),
       const SizedBox(height: 6),
       Expanded(
@@ -700,7 +831,7 @@ class _LiveScreenState extends State<LiveScreen> {
       return '${m.nr(e.playerId)} ${e.skill}';
     }
 
-    Color kindColor(String k) => k == 'T' ? C.timeout : (k == 'C' ? C.sub : C.libero);
+    Color kindColor(String k) => k == 'T' ? C.timeout : (k == 'C' ? C.sub : (k == 'M' ? C.muted : C.libero));
 
     BoxDecoration box() => BoxDecoration(
           color: C.surface,
