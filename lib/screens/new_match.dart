@@ -39,6 +39,7 @@ class _NewMatchScreenState extends State<NewMatchScreen> {
     }
     final m = MatchData(
       id: newId(),
+      teamId: team.id,
       opponent: _opp.text.trim(),
       competition: _comp.text.trim(),
       home: _home,

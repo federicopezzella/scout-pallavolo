@@ -79,15 +79,15 @@ class _BackupScreenState extends State<BackupScreen> {
         builder: (ctx) => AlertDialog(
           title: const Text('Importa backup'),
           content: Text(
-            'Il file contiene ${incoming.matches.length} partite e ${incoming.team.players.length} giocatori '
-            '(squadra "${incoming.team.name}").\n\n'
+            'Il file contiene ${incoming.teams.length == 1 ? '1 squadra' : '${incoming.teams.length} squadre'} '
+            '(${incoming.teams.map((t) => t.name).join(', ')}) e ${incoming.matches.length} partite.\n\n'
             'Partite non ancora presenti qui: ${newOnes.length}.',
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Annulla')),
             OutlinedButton(
-              onPressed: newOnes.isEmpty ? null : () => Navigator.pop(ctx, 'merge'),
-              child: Text('Aggiungi ${newOnes.length} partite'),
+              onPressed: () => Navigator.pop(ctx, 'merge'),
+              child: Text(newOnes.isEmpty ? 'Aggiungi squadre mancanti' : 'Aggiungi ${newOnes.length} partite'),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, 'replace'),
@@ -102,7 +102,7 @@ class _BackupScreenState extends State<BackupScreen> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Sostituire tutti i dati?'),
-            content: const Text('Rosa e partite attuali verranno sostituite da quelle del file. Se vuoi tenerle, esporta prima un backup.'),
+            content: const Text('Squadre, rose e partite attuali verranno sostituite da quelle del file. Se vuoi tenerle, esporta prima un backup.'),
             actions: [
               TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annulla')),
               FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Sostituisci')),
@@ -114,10 +114,27 @@ class _BackupScreenState extends State<BackupScreen> {
         await store.save();
         _msg('Dati ripristinati dal backup');
       } else if (choice == 'merge') {
+        // squadre: stessa squadra se ha lo stesso id o lo stesso nome, altrimenti la aggiunge
+        final remap = <String, String>{};
+        var addedTeams = 0;
+        for (final t in incoming.teams) {
+          final same = store.data.teamById(t.id) ??
+              store.data.teams.where((x) => x.name.trim().toLowerCase() == t.name.trim().toLowerCase()).firstOrNull;
+          if (same != null) {
+            remap[t.id] = same.id;
+            if (same.players.isEmpty) same.players = t.players;
+          } else {
+            store.data.teams.add(t);
+            addedTeams++;
+          }
+        }
+        for (final m in newOnes) {
+          m.teamId = remap[m.teamId] ?? m.teamId;
+        }
         store.data.matches.addAll(newOnes);
-        if (store.data.team.players.isEmpty) store.data.team = incoming.team;
+        store.data.normalize();
         await store.save();
-        _msg('Aggiunte ${newOnes.length} partite');
+        _msg('Aggiunte ${newOnes.length} partite${addedTeams > 0 ? ' e $addedTeams squadre' : ''}');
       }
     } catch (e) {
       _msg('Importazione non riuscita: $e');
@@ -141,7 +158,8 @@ class _BackupScreenState extends State<BackupScreen> {
                 constraints: const BoxConstraints(maxWidth: 560),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   Text(
-                    'Dati attuali: ${store.data.team.players.length} giocatori, ${store.data.matches.length} partite.',
+                    'Dati attuali: ${store.data.teams.length == 1 ? '1 squadra' : '${store.data.teams.length} squadre'}, '
+                    '${store.data.matches.length} partite.',
                     style: const TextStyle(fontSize: 16),
                   ),
                   const SizedBox(height: 6),
@@ -162,7 +180,7 @@ class _BackupScreenState extends State<BackupScreen> {
                   ),
                   const SizedBox(height: 8),
                   const Text(
-                    'Crea un file .json con rosa e partite. Salvalo in File, su Drive/iCloud o mandalo a te stesso.',
+                    'Crea un file .json con tutte le squadre, le rose e le partite. Salvalo in File, su Drive/iCloud o mandalo a te stesso.',
                     style: TextStyle(color: C.muted, fontSize: 13),
                   ),
                   const SizedBox(height: 28),

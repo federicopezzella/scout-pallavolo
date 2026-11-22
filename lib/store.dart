@@ -11,7 +11,7 @@ import 'models.dart';
 /// file su Android/iOS, memoria del browser (localStorage) nella webapp.
 class AppStore extends ChangeNotifier {
   static const _webKey = 'scout_data';
-  AppData data = AppData(team: Team.empty(), matches: []);
+  AppData data = AppData(teams: [Team.empty()], matches: []);
   File? _file;
   SharedPreferences? _prefs;
   Future<void> _pending = Future.value();

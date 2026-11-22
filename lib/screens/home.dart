@@ -12,6 +12,7 @@ import 'live.dart';
 import 'new_match.dart';
 import 'roster.dart';
 import 'stats.dart';
+import 'teams.dart';
 
 const appBuild = String.fromEnvironment('BUILD', defaultValue: 'dev');
 
@@ -59,7 +60,8 @@ class HomeScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: store,
       builder: (context, _) {
-        final matches = List.of(store.data.matches)..sort((a, b) => b.date.compareTo(a.date));
+        final team = store.data.team;
+        final matches = store.data.teamMatches..sort((a, b) => b.date.compareTo(a.date));
         final running = matches.where((m) => !m.finished).toList();
         final done = matches.where((m) => m.finished).toList();
         final last = store.data.lastBackup;
@@ -82,7 +84,7 @@ class HomeScreen extends StatelessWidget {
                 label: const Text('Backup'),
               ),
               TextButton.icon(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RosterScreen())),
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => RosterScreen(team: team))),
                 icon: const Icon(Icons.groups),
                 label: const Text('Rosa'),
               ),
@@ -94,12 +96,15 @@ class HomeScreen extends StatelessWidget {
             icon: const Icon(Icons.add),
             label: const Text('Nuova partita', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
-          body: matches.isEmpty
-              ? const Center(
+          body: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+            _TeamBar(team: team),
+            Expanded(
+              child: matches.isEmpty
+              ? Center(
                   child: Text(
-                    'Nessuna partita.\nPrima inserisci la rosa, poi crea una nuova partita.',
+                    'Nessuna partita per ${team.name}.\nPrima inserisci la rosa, poi crea una nuova partita.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: C.muted, fontSize: 16),
+                    style: const TextStyle(color: C.muted, fontSize: 16),
                   ),
                 )
               : ListView(
@@ -123,7 +128,7 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
                     if (done.isNotEmpty) ...[
-                      _TrendSection(matches: store.data.matches),
+                      _TrendSection(matches: matches),
                       const SizedBox(height: 24),
                     ],
                     if (running.isNotEmpty) ...[
@@ -141,6 +146,8 @@ class HomeScreen extends StatelessWidget {
                     const Text('Tieni premuto su una partita per eliminarla.', style: TextStyle(color: C.muted, fontSize: 12)),
                   ],
                 ),
+            ),
+          ]),
         );
       },
     );
@@ -277,5 +284,68 @@ class _TrendSection extends StatelessWidget {
         );
       }),
     ]);
+  }
+}
+
+/// Barra in alto nella home: squadra attiva e cambio rapido.
+class _TeamBar extends StatelessWidget {
+  final Team team;
+  const _TeamBar({required this.team});
+
+  @override
+  Widget build(BuildContext context) {
+    final teams = store.data.teams;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
+      decoration: const BoxDecoration(color: C.surface, border: Border(bottom: BorderSide(color: C.line))),
+      child: Row(children: [
+        Jersey(color: Color(team.jerseyColor), number: team.players.isEmpty ? 0 : team.players.first.number, width: 36),
+        const SizedBox(width: 10),
+        Expanded(
+          child: PopupMenuButton<String>(
+            tooltip: 'Cambia squadra',
+            onSelected: (id) {
+              if (id == '_manage') {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TeamsScreen()));
+                return;
+              }
+              store.data.currentTeamId = id;
+              store.save();
+            },
+            itemBuilder: (_) => [
+              for (final t in teams)
+                PopupMenuItem(
+                  value: t.id,
+                  child: Row(children: [
+                    Icon(t.id == team.id ? Icons.check : Icons.circle, size: t.id == team.id ? 20 : 12,
+                        color: t.id == team.id ? C.accent : Color(t.jerseyColor)),
+                    const SizedBox(width: 10),
+                    Text(t.name),
+                  ]),
+                ),
+              const PopupMenuDivider(),
+              const PopupMenuItem(
+                value: '_manage',
+                child: Row(children: [Icon(Icons.groups, size: 20), SizedBox(width: 10), Text('Gestisci squadre')]),
+              ),
+            ],
+            child: Row(children: [
+              Flexible(
+                child: Text(team.name,
+                    overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              ),
+              const Icon(Icons.arrow_drop_down),
+              if (teams.length > 1)
+                Text('  ${teams.length} squadre', style: const TextStyle(color: C.muted, fontSize: 13)),
+            ]),
+          ),
+        ),
+        TextButton.icon(
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const TeamsScreen())),
+          icon: const Icon(Icons.add),
+          label: const Text('Squadre'),
+        ),
+      ]),
+    );
   }
 }

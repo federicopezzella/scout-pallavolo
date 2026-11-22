@@ -6,7 +6,8 @@ import '../theme.dart';
 import '../widgets.dart';
 
 class RosterScreen extends StatefulWidget {
-  const RosterScreen({super.key});
+  final Team team;
+  const RosterScreen({super.key, required this.team});
 
   @override
   State<RosterScreen> createState() => _RosterScreenState();
@@ -15,7 +16,7 @@ class RosterScreen extends StatefulWidget {
 class _RosterScreenState extends State<RosterScreen> {
   late final TextEditingController _name;
 
-  Team get team => store.data.team;
+  Team get team => widget.team;
 
   @override
   void initState() {
@@ -154,7 +155,7 @@ class _RosterScreenState extends State<RosterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Rosa e divise')),
+      appBar: AppBar(title: Text('Rosa · ${team.name}')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _edit(),
         icon: const Icon(Icons.person_add),
@@ -166,7 +167,7 @@ class _RosterScreenState extends State<RosterScreen> {
             controller: _name,
             decoration: const InputDecoration(labelText: 'Nome squadra'),
             onChanged: (v) {
-              team.name = v.trim().isEmpty ? 'La mia squadra' : v.trim();
+              setState(() => team.name = v.trim().isEmpty ? 'Squadra senza nome' : v.trim());
               store.save();
             },
           ),

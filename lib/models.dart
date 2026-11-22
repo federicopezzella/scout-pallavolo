@@ -56,26 +56,30 @@ class Player {
 }
 
 class Team {
+  String id;
   String name;
   int jerseyColor;
   int liberoColor;
   List<Player> players;
 
   Team({
+    required this.id,
     required this.name,
     required this.jerseyColor,
     required this.liberoColor,
     required this.players,
   });
 
-  factory Team.empty() => Team(
-        name: 'La mia squadra',
+  factory Team.empty({String name = 'La mia squadra'}) => Team(
+        id: newId(),
+        name: name,
         jerseyColor: 0xFF1F6FD1,
         liberoColor: 0xFFE9C46A,
         players: [],
       );
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         'name': name,
         'jerseyColor': jerseyColor,
         'liberoColor': liberoColor,
@@ -83,6 +87,7 @@ class Team {
       };
 
   factory Team.fromJson(Map<String, dynamic> j) => Team(
+        id: (j['id'] as String?) ?? newId(),
         name: j['name'] as String,
         jerseyColor: (j['jerseyColor'] as num).toInt(),
         liberoColor: (j['liberoColor'] as num).toInt(),
@@ -221,6 +226,8 @@ class SetData {
 
 class MatchData {
   String id;
+  /// squadra (rosa) a cui appartiene la partita
+  String? teamId;
   String opponent;
   String competition;
   bool home;
@@ -236,6 +243,7 @@ class MatchData {
 
   MatchData({
     required this.id,
+    this.teamId,
     required this.opponent,
     required this.competition,
     required this.home,
@@ -288,6 +296,7 @@ class MatchData {
         'sets': sets.map((s) => s.toJson()).toList(),
         'finished': finished,
         'maxSubs': maxSubs,
+        if (teamId != null) 'teamId': teamId,
       };
 
   factory MatchData.fromJson(Map<String, dynamic> j) => MatchData(
@@ -307,28 +316,61 @@ class MatchData {
             .toList(),
         finished: (j['finished'] as bool?) ?? false,
         maxSubs: (j['maxSubs'] as num?)?.toInt() ?? 8,
+        teamId: j['teamId'] as String?,
       );
 }
 
 class AppData {
-  Team team;
+  List<Team> teams;
+  String currentTeamId;
   List<MatchData> matches;
   int? lastBackup;
 
-  AppData({required this.team, required this.matches, this.lastBackup});
+  AppData({required List<Team> teams, String? currentTeamId, required this.matches, this.lastBackup})
+      : teams = teams.isEmpty ? [Team.empty()] : teams,
+        currentTeamId = currentTeamId ?? '' {
+    normalize();
+  }
+
+  /// Squadra attiva (quella scelta in home).
+  Team get team => teams.firstWhere((t) => t.id == currentTeamId, orElse: () => teams.first);
+
+  Team? teamById(String? id) {
+    for (final t in teams) {
+      if (t.id == id) return t;
+    }
+    return null;
+  }
+
+  /// Partite della squadra attiva.
+  List<MatchData> get teamMatches => matches.where((m) => m.teamId == team.id).toList();
+
+  /// Sistema i dati: almeno una squadra, squadra attiva valida, ogni partita con una squadra.
+  void normalize() {
+    if (teams.isEmpty) teams.add(Team.empty());
+    if (teamById(currentTeamId) == null) currentTeamId = teams.first.id;
+    for (final m in matches) {
+      if (teamById(m.teamId) == null) m.teamId = teams.first.id;
+    }
+  }
 
   Map<String, dynamic> toJson() => {
-        'version': 1,
-        'team': team.toJson(),
+        'version': 2,
+        'teams': teams.map((t) => t.toJson()).toList(),
+        'currentTeamId': currentTeamId,
         'matches': matches.map((m) => m.toJson()).toList(),
         if (lastBackup != null) 'lastBackup': lastBackup,
       };
 
-  factory AppData.fromJson(Map<String, dynamic> j) => AppData(
-        team: Team.fromJson(j['team'] as Map<String, dynamic>),
-        matches: (j['matches'] as List)
-            .map((e) => MatchData.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        lastBackup: (j['lastBackup'] as num?)?.toInt(),
-      );
+  factory AppData.fromJson(Map<String, dynamic> j) {
+    final teams = j['teams'] is List
+        ? (j['teams'] as List).map((e) => Team.fromJson(e as Map<String, dynamic>)).toList()
+        : [if (j['team'] != null) Team.fromJson(j['team'] as Map<String, dynamic>)];
+    return AppData(
+      teams: teams,
+      currentTeamId: j['currentTeamId'] as String?,
+      matches: (j['matches'] as List).map((e) => MatchData.fromJson(e as Map<String, dynamic>)).toList(),
+      lastBackup: (j['lastBackup'] as num?)?.toInt(),
+    );
+  }
 }

@@ -215,4 +215,24 @@ void main() {
     s.events.add(const GameEvent(type: 'adj', t: 0, team: 'us', delta: 1));
     expect(replaySet(m, s).finished, true);
   });
+
+  test('più squadre e vecchio formato con una sola rosa', () {
+    final legacy = AppData.fromJson({
+      'team': {'name': 'Under 16', 'jerseyColor': 1, 'liberoColor': 2, 'players': []},
+      'matches': [
+        {'id': 'm1', 'opponent': 'A', 'date': 0, 'teamName': 'Under 16', 'jerseyColor': 1, 'liberoColor': 2,
+         'players': [], 'sets': []},
+      ],
+    });
+    expect(legacy.teams.length, 1);
+    expect(legacy.team.name, 'Under 16');
+    expect(legacy.matches.first.teamId, legacy.team.id);
+    final second = Team.empty(name: 'Under 18');
+    legacy.teams.add(second);
+    legacy.currentTeamId = second.id;
+    expect(legacy.teamMatches, isEmpty);
+    final round = AppData.fromJson(legacy.toJson());
+    expect(round.teams.map((t) => t.name), ['Under 16', 'Under 18']);
+    expect(round.team.name, 'Under 18');
+  });
 }
